@@ -1,0 +1,5 @@
+{
+  "name": "Katalog Inventaris Paragita",
+  "description": "Website katalog untuk melihat daftar barang, status peminjaman, dan informasi inventaris di ruang sekre PSM.",
+  "requestFramePermissions": []
+}
