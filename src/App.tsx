@@ -394,20 +394,33 @@ export default function App() {
                 </button>
                 <button 
                   disabled={selectedItem.status !== 'Tersedia'}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors flex items-center gap-2 ${
+                  className={`p-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors flex items-center justify-center ${
                     selectedItem.status !== 'Tersedia'
                       ? 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
                       : cart.some(i => i.id === selectedItem.id)
                         ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800/50'
-                        : 'text-white bg-indigo-600 hover:bg-indigo-700'
+                        : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/50'
                   }`}
                   onClick={() => toggleCartItem(selectedItem)}
+                  title={cart.some(i => i.id === selectedItem.id) ? "Hapus dari Keranjang" : "Tambah ke Keranjang"}
                 >
-                  {selectedItem.status !== 'Tersedia' 
-                    ? 'Tidak Tersedia' 
-                    : cart.some(i => i.id === selectedItem.id) 
-                      ? 'Hapus dari Keranjang' 
-                      : 'Tambah ke Keranjang'}
+                  <ShoppingCart size={20} />
+                </button>
+                <button 
+                  disabled={selectedItem.status !== 'Tersedia'}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors ${
+                    selectedItem.status === 'Tersedia'
+                      ? 'text-white bg-indigo-600 hover:bg-indigo-700'
+                      : 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
+                  }`}
+                  onClick={() => {
+                    const phoneNumber = "6281218795969"; 
+                    const message = `Halo pengurus Invent, saya ingin meminjam barang berikut:\n\nNama Barang: *${selectedItem.name}*\nKategori: *${selectedItem.category}*\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
+                    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+                    window.open(whatsappUrl, '_blank');
+                  }}
+                >
+                  Ajukan Peminjaman
                 </button>
               </div>
             </motion.div>
