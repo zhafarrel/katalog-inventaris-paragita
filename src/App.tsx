@@ -353,7 +353,7 @@ export default function App() {
                   }`}
                   onClick={() => {
                     const phoneNumber = "6281218795969"; 
-                    const message = `Halo pengurus PSM, saya ingin meminjam barang berikut:\n\nNama Barang: *${selectedItem.name}*\nKategori: *${selectedItem.category}*\n\nMohon info lebih lanjut mengenai prosedurnya. Terima kasih.`;
+                    const message = `Halo pengurus Invent, saya ingin meminjam barang berikut:\n\nNama Barang: *${selectedItem.name}*\nKategori: *${selectedItem.category}*\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
                     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
                     window.open(whatsappUrl, '_blank');
                   }}
