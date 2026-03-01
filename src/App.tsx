@@ -43,15 +43,19 @@ export default function App() {
             // sesuai dengan nama "API ID" yang ada di DatoCMS (menu Settings > Models)
             query: `
               query {
-                allInventoryItems {
-                  id
-                  namaBarang
-                  kategori
-                  status
-                  letak
-                  foto {
-                    url
+                inventory-item {
+                  name
+                  category
+                  status_item
+                  availablequantity
+                  totalquantity
+                  description
+                  image {
+                    ul
                   }
+                  location
+                  borrowerInfo
+                  expectedReturnDate
                 }
               }
             `
