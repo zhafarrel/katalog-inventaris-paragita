@@ -8,7 +8,6 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   
-  // State untuk menyimpan data dari DatoCMS
   const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -27,7 +26,7 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // Mengambil data dari DatoCMS
+  // Mengambil data dari DatoCMS dengan API ID yang baru
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -39,14 +38,14 @@ export default function App() {
             'Authorization': `Bearer ${import.meta.env.VITE_DATOCMS_API_TOKEN}`,
           },
           body: JSON.stringify({
-            // PERHATIAN: Jika tabel tidak muncul, pastikan nama allInventoryItems, namaBarang, kategori, dll 
-            // sesuai dengan nama "API ID" yang ada di DatoCMS (menu Settings > Models)
+            // Query ini sudah disesuaikan persis dengan API ID di screenshot DatoCMS-mu
             query: `
               query {
-                inventory-item {
+                allInventoryItems {
+                  id
                   name
                   category
-                  status_item
+                  statusItem
                   availablequantity
                   totalquantity
                   description
@@ -54,8 +53,8 @@ export default function App() {
                     url
                   }
                   location
-                  borrowerInfo
-                  expectedReturnDate
+                  borrowerinfo
+                  expectedreturndate
                 }
               }
             `
@@ -70,17 +69,19 @@ export default function App() {
           return;
         }
 
-        // Menyesuaikan data DatoCMS dengan kode tampilan
+        // Menyambungkan data DatoCMS dengan kode tampilan
         const formattedData: InventoryItem[] = result.data.allInventoryItems.map((item: any) => ({
           id: item.id,
-          name: item.namaBarang || 'Tanpa Nama',
-          category: item.kategori || 'Lain-lain',
-          status: item.status || 'Tersedia',
-          location: item.letak || '-',
-          imageUrl: item.foto?.url || 'https://via.placeholder.com/400x300?text=Tidak+Ada+Foto',
-          description: '', 
-          availableQuantity: 1, 
-          totalQuantity: 1,
+          name: item.name || 'Tanpa Nama',
+          category: item.category || 'Lain-lain',
+          status: item.statusItem || 'Tersedia',
+          location: item.location || '-',
+          imageUrl: item.image?.url || 'https://via.placeholder.com/400x300?text=Tidak+Ada+Foto',
+          description: item.description || '', 
+          availableQuantity: item.availablequantity || 0, 
+          totalQuantity: item.totalquantity || 0,
+          borrowerInfo: item.borrowerinfo || '',
+          expectedReturnDate: item.expectedreturndate || '',
         }));
         
         setInventoryData(formattedData);
@@ -116,7 +117,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen font-sans pb-12 transition-colors duration-200 bg-white dark:bg-gray-950">
-      {/* Header */}
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10 shadow-sm transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -156,7 +156,6 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Categories */}
         <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
           <Filter className="h-5 w-5 text-gray-400 dark:text-gray-500 mr-2 flex-shrink-0" />
           {categories.map(category => (
@@ -174,7 +173,6 @@ export default function App() {
           ))}
         </div>
 
-        {/* Grid or Loading State */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="h-10 w-10 text-indigo-500 animate-spin mb-4" />
@@ -234,7 +232,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Modal */}
       <AnimatePresence>
         {selectedItem && (
           <>
@@ -285,6 +282,13 @@ export default function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 mt-4">
                   <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 flex items-start gap-3">
+                    <Package className="text-gray-400 dark:text-gray-500 mt-0.5" size={20} />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">Kuantitas</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{selectedItem.availableQuantity} dari {selectedItem.totalQuantity} tersedia</div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 flex items-start gap-3">
                     <MapPin className="text-gray-400 dark:text-gray-500 mt-0.5" size={20} />
                     <div>
                       <div className="text-sm font-medium text-gray-900 dark:text-white">Lokasi Penyimpanan</div>
@@ -292,6 +296,35 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {selectedItem.status !== 'Tersedia' && (
+                  <div className={`p-4 rounded-xl border mb-8 ${
+                    selectedItem.status === 'Dipinjam' 
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50' 
+                      : 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-900/50'
+                  }`}>
+                    <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
+                      selectedItem.status === 'Dipinjam' ? 'text-amber-800 dark:text-amber-400' : 'text-rose-800 dark:text-rose-400'
+                    }`}>
+                      <Info size={16} />
+                      Informasi {selectedItem.status}
+                    </h4>
+                    <div className="space-y-2">
+                      {selectedItem.borrowerInfo && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <User size={16} className={selectedItem.status === 'Dipinjam' ? 'text-amber-600 dark:text-amber-500' : 'text-rose-600 dark:text-rose-500'} />
+                          <span className="text-gray-700 dark:text-gray-300">{selectedItem.borrowerInfo}</span>
+                        </div>
+                      )}
+                      {selectedItem.expectedReturnDate && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <Calendar size={16} className={selectedItem.status === 'Dipinjam' ? 'text-amber-600 dark:text-amber-500' : 'text-rose-600 dark:text-rose-500'} />
+                          <span className="text-gray-700 dark:text-gray-300">Estimasi kembali: <span className="font-medium text-gray-900 dark:text-white">{new Date(selectedItem.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span></span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Cara Meminjam</h4>
@@ -319,7 +352,7 @@ export default function App() {
                       : 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
                   }`}
                   onClick={() => {
-                    const phoneNumber = "6281218795969"; // Nomor WhatsApp pengurus
+                    const phoneNumber = "6281218795969"; 
                     const message = `Halo pengurus PSM, saya ingin meminjam barang berikut:\n\nNama Barang: *${selectedItem.name}*\nKategori: *${selectedItem.category}*\n\nMohon info lebih lanjut mengenai prosedurnya. Terima kasih.`;
                     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
                     window.open(whatsappUrl, '_blank');
