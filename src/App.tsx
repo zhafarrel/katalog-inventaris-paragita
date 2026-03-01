@@ -51,7 +51,7 @@ export default function App() {
                   totalquantity
                   description
                   image {
-                    ul
+                    url
                   }
                   location
                   borrowerInfo
