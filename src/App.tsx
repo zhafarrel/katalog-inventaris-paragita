@@ -1,17 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon, Loader2 } from 'lucide-react';
+import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { inventoryData as mockData } from './data';
+import { inventoryData } from './data';
 import { InventoryItem, ItemStatus } from './types';
 
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return document.documentElement.classList.contains('dark') || window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -27,88 +23,16 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  useEffect(() => {
-    const fetchDatoCMS = async () => {
-      const token = import.meta.env.VITE_DATOCMS_API_TOKEN;
-      if (!token) {
-        // Fallback to mock data if no token is provided
-        setItems(mockData);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch('https://graphql.datocms.com/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            query: `
-              query {
-                allInventoryItems(first: 100) {
-                  id
-                  name
-                  category
-                  statusItem
-                  availablequantity
-                  totalquantity
-                  description
-                  image {
-                    url
-                  }
-                  location
-                  borrowerinfo
-                  expectedreturndate
-                }
-              }
-            `
-          }),
-        });
-
-        const result = await response.json();
-        if (result.errors) {
-          throw new Error(result.errors[0].message);
-        }
-
-        const formattedItems: InventoryItem[] = result.data.allInventoryItems.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          category: item.category,
-          status: item.statusItem as ItemStatus,
-          availableQuantity: item.availablequantity,
-          totalQuantity: item.totalquantity,
-          description: item.description,
-          imageUrl: item.image?.url || 'https://picsum.photos/seed/placeholder/400/300',
-          location: item.location,
-          borrowerInfo: item.borrowerinfo,
-          expectedReturnDate: item.expectedreturndate,
-        }));
-
-        setItems(formattedItems);
-      } catch (err: any) {
-        console.error('Error fetching from DatoCMS:', err);
-        setError(err.message);
-        setItems(mockData); // fallback to mock data on error
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDatoCMS();
-  }, []);
-
-  const categories = ['Semua', ...Array.from(new Set(items.map(item => item.category)))];
+  const categories = ['Semua', ...Array.from(new Set(inventoryData.map(item => item.category)))];
 
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    return inventoryData.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             item.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'Semua' || item.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory, items]);
+  }, [searchQuery, selectedCategory]);
 
   const getStatusColor = (status: ItemStatus) => {
     switch (status) {
@@ -180,12 +104,7 @@ export default function App() {
         </div>
 
         {/* Grid */}
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="h-10 w-10 text-indigo-600 animate-spin mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">Memuat data inventaris...</p>
-          </div>
-        ) : filteredItems.length > 0 ? (
+        {filteredItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <AnimatePresence>
               {filteredItems.map((item) => (
@@ -355,9 +274,17 @@ export default function App() {
                   Tutup
                 </button>
                 <button 
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-colors"
+                  disabled={selectedItem.status !== 'Tersedia'}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors ${
+                    selectedItem.status === 'Tersedia'
+                      ? 'text-white bg-indigo-600 hover:bg-indigo-700'
+                      : 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
+                  }`}
                   onClick={() => {
-                    alert('Fitur pengajuan peminjaman dapat diintegrasikan dengan form atau WhatsApp pengurus.');
+                    const phoneNumber = "6281218795969"; // Ganti dengan nomor WhatsApp pengurus
+                    const message = `Halo pengurus PSM, saya ingin meminjam barang berikut:\n\nNama Barang: ${selectedItem.name}\nKategori: ${selectedItem.category}\n\nMohon info lebih lanjut mengenai prosedurnya. Terima kasih.`;
+                    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+                    window.open(whatsappUrl, '_blank');
                   }}
                 >
                   Ajukan Peminjaman
