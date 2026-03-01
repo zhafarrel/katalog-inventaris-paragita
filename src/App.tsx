@@ -1,13 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon } from 'lucide-react';
+import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { inventoryData } from './data';
 import { InventoryItem, ItemStatus } from './types';
 
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  
+  // State untuk menyimpan data dari DatoCMS
+  const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return document.documentElement.classList.contains('dark') || window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -23,18 +27,81 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  // Mengambil data dari DatoCMS
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch('https://graphql.datocms.com/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_DATOCMS_API_TOKEN}`,
+          },
+          body: JSON.stringify({
+            // PERHATIAN: Jika tabel tidak muncul, pastikan nama allInventoryItems, namaBarang, kategori, dll 
+            // sesuai dengan nama "API ID" yang ada di DatoCMS (menu Settings > Models)
+            query: `
+              query {
+                allInventoryItems {
+                  id
+                  namaBarang
+                  kategori
+                  status
+                  letak
+                  foto {
+                    url
+                  }
+                }
+              }
+            `
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (result.errors) {
+          console.error("Error dari DatoCMS:", result.errors);
+          setIsLoading(false);
+          return;
+        }
+
+        // Menyesuaikan data DatoCMS dengan kode tampilan
+        const formattedData: InventoryItem[] = result.data.allInventoryItems.map((item: any) => ({
+          id: item.id,
+          name: item.namaBarang || 'Tanpa Nama',
+          category: item.kategori || 'Lain-lain',
+          status: item.status || 'Tersedia',
+          location: item.letak || '-',
+          imageUrl: item.foto?.url || 'https://via.placeholder.com/400x300?text=Tidak+Ada+Foto',
+          description: '', 
+          availableQuantity: 1, 
+          totalQuantity: 1,
+        }));
+        
+        setInventoryData(formattedData);
+      } catch (error) {
+        console.error("Gagal mengambil data dari DatoCMS:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   const categories = ['Semua', ...Array.from(new Set(inventoryData.map(item => item.category)))];
 
   const filteredItems = useMemo(() => {
     return inventoryData.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            item.description.toLowerCase().includes(searchQuery.toLowerCase());
+                            (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory = selectedCategory === 'Semua' || item.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, inventoryData]);
 
-  const getStatusColor = (status: ItemStatus) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'Tersedia': return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50';
       case 'Dipinjam': return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/50';
@@ -44,7 +111,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen font-sans pb-12 transition-colors duration-200">
+    <div className="min-h-screen font-sans pb-12 transition-colors duration-200 bg-white dark:bg-gray-950">
       {/* Header */}
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10 shadow-sm transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -67,7 +134,7 @@ export default function App() {
                 <input
                   type="text"
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-xl leading-5 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:bg-white dark:focus:bg-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
-                  placeholder="Cari nama barang atau deskripsi..."
+                  placeholder="Cari nama barang..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -103,8 +170,13 @@ export default function App() {
           ))}
         </div>
 
-        {/* Grid */}
-        {filteredItems.length > 0 ? (
+        {/* Grid or Loading State */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-10 w-10 text-indigo-500 animate-spin mb-4" />
+            <p className="text-gray-500 dark:text-gray-400">Sedang mengambil data dari DatoCMS...</p>
+          </div>
+        ) : filteredItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <AnimatePresence>
               {filteredItems.map((item) => (
@@ -126,11 +198,7 @@ export default function App() {
                       referrerPolicy="no-referrer"
                     />
                     <div className="absolute top-3 right-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 ${
-                        item.status === 'Tersedia' ? 'text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' :
-                        item.status === 'Dipinjam' ? 'text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50' :
-                        'text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50'
-                      }`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 ${getStatusColor(item.status)}`}>
                         {item.status}
                       </span>
                     </div>
@@ -141,8 +209,8 @@ export default function App() {
                     <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-4 flex-grow">{item.description}</p>
                     
                     <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100 dark:border-gray-800">
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        <span className="font-semibold text-gray-900 dark:text-white">{item.availableQuantity}</span> / {item.totalQuantity} tersedia
+                      <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                        <MapPin size={14}/> {item.location}
                       </div>
                       <button className="text-indigo-600 dark:text-indigo-400 text-sm font-medium hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors">
                         Detail &rarr;
@@ -157,7 +225,7 @@ export default function App() {
           <div className="text-center py-20">
             <Package className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">Barang tidak ditemukan</h3>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Coba gunakan kata kunci lain atau ubah filter kategori.</p>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Belum ada barang di kategori ini, atau kata kunci tidak cocok.</p>
           </div>
         )}
       </main>
@@ -205,18 +273,13 @@ export default function App() {
                   </span>
                 </div>
 
-                <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
-                  {selectedItem.description}
-                </p>
+                {selectedItem.description && (
+                  <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
+                    {selectedItem.description}
+                  </p>
+                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 flex items-start gap-3">
-                    <Package className="text-gray-400 dark:text-gray-500 mt-0.5" size={20} />
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">Kuantitas</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{selectedItem.availableQuantity} dari {selectedItem.totalQuantity} tersedia</div>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 mt-4">
                   <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 flex items-start gap-3">
                     <MapPin className="text-gray-400 dark:text-gray-500 mt-0.5" size={20} />
                     <div>
@@ -226,41 +289,12 @@ export default function App() {
                   </div>
                 </div>
 
-                {selectedItem.status !== 'Tersedia' && (
-                  <div className={`p-4 rounded-xl border mb-8 ${
-                    selectedItem.status === 'Dipinjam' 
-                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50' 
-                      : 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-900/50'
-                  }`}>
-                    <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
-                      selectedItem.status === 'Dipinjam' ? 'text-amber-800 dark:text-amber-400' : 'text-rose-800 dark:text-rose-400'
-                    }`}>
-                      <Info size={16} />
-                      Informasi {selectedItem.status}
-                    </h4>
-                    <div className="space-y-2">
-                      {selectedItem.borrowerInfo && (
-                        <div className="flex items-start gap-2 text-sm">
-                          <User size={16} className={selectedItem.status === 'Dipinjam' ? 'text-amber-600 dark:text-amber-500' : 'text-rose-600 dark:text-rose-500'} />
-                          <span className="text-gray-700 dark:text-gray-300">{selectedItem.borrowerInfo}</span>
-                        </div>
-                      )}
-                      {selectedItem.expectedReturnDate && (
-                        <div className="flex items-start gap-2 text-sm">
-                          <Calendar size={16} className={selectedItem.status === 'Dipinjam' ? 'text-amber-600 dark:text-amber-500' : 'text-rose-600 dark:text-rose-500'} />
-                          <span className="text-gray-700 dark:text-gray-300">Estimasi kembali: <span className="font-medium text-gray-900 dark:text-white">{new Date(selectedItem.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span></span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Cara Meminjam</h4>
                   <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-decimal list-inside">
-                    <li>Pastikan status barang <strong className="text-gray-900 dark:text-white">Tersedia</strong> dan kuantitas mencukupi.</li>
+                    <li>Pastikan status barang <strong className="text-gray-900 dark:text-white">Tersedia</strong>.</li>
                     <li>Hubungi pengurus PSM divisi Rumah Tangga / Inventaris.</li>
-                    <li>Isi form peminjaman di sekre atau melalui link yang disediakan pengurus.</li>
+                    <li>Klik tombol "Ajukan Peminjaman" di bawah untuk mengonfirmasi via WhatsApp.</li>
                     <li>Jaga barang dengan baik dan kembalikan tepat waktu.</li>
                   </ol>
                 </div>
@@ -281,8 +315,8 @@ export default function App() {
                       : 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
                   }`}
                   onClick={() => {
-                    const phoneNumber = "6281218795969"; // Ganti dengan nomor WhatsApp pengurus
-                    const message = `Halo pengurus PSM, saya ingin meminjam barang berikut:\n\nNama Barang: ${selectedItem.name}\nKategori: ${selectedItem.category}\n\nMohon info lebih lanjut mengenai prosedurnya. Terima kasih.`;
+                    const phoneNumber = "6281218795969"; // Nomor WhatsApp pengurus
+                    const message = `Halo pengurus PSM, saya ingin meminjam barang berikut:\n\nNama Barang: *${selectedItem.name}*\nKategori: *${selectedItem.category}*\n\nMohon info lebih lanjut mengenai prosedurnya. Terima kasih.`;
                     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
                     window.open(whatsappUrl, '_blank');
                   }}
