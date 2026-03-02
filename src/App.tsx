@@ -6,6 +6,7 @@ import { InventoryItem, ItemStatus } from './types';
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
+  const [sortBy, setSortBy] = useState<string>('Terbaru');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   
   const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
@@ -101,13 +102,22 @@ export default function App() {
   const categories = ['Semua', ...Array.from(new Set(inventoryData.map(item => item.category)))];
 
   const filteredItems = useMemo(() => {
-    return inventoryData.filter(item => {
+    let result = inventoryData.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory = selectedCategory === 'Semua' || item.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const matchesStatus = sortBy === 'Tersedia' ? item.status === 'Tersedia' : true;
+      return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [searchQuery, selectedCategory, inventoryData]);
+
+    if (sortBy === 'A-Z') {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'Z-A') {
+      result.sort((a, b) => b.name.localeCompare(a.name));
+    }
+
+    return result;
+  }, [searchQuery, selectedCategory, inventoryData, sortBy]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -192,21 +202,37 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
-          <Filter className="h-5 w-5 text-gray-400 dark:text-gray-500 mr-2 flex-shrink-0" />
-          {categories.map(category => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                selectedCategory === category
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-              }`}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+            <Filter className="h-5 w-5 text-gray-400 dark:text-gray-500 mr-2 flex-shrink-0" />
+            {categories.map(category => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  selectedCategory === category
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+          
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-sm text-gray-500 dark:text-gray-400">Urutkan:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-2 transition-colors outline-none cursor-pointer"
             >
-              {category}
-            </button>
-          ))}
+              <option value="Terbaru">Terbaru</option>
+              <option value="A-Z">A - Z</option>
+              <option value="Z-A">Z - A</option>
+              <option value="Tersedia">Hanya yang Tersedia</option>
+            </select>
+          </div>
         </div>
 
         {isLoading ? (
