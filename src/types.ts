@@ -1,5 +1,13 @@
 export type ItemStatus = 'Tersedia' | 'Dipinjam' | 'Pemeliharaan';
 
+export interface BorrowLog {
+  id: string;
+  borrowerName: string;
+  quantity: number;
+  borrowDate: string;
+  expectedReturnDate: string;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -14,6 +22,7 @@ export interface InventoryItem {
   borrowDate?: string;
   expectedReturnDate?: string;
   allowPartialBorrowing?: boolean;
+  borrowLogs?: BorrowLog[];
 }
 
 export interface CartItem extends InventoryItem {

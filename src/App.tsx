@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon, Loader2, ShoppingCart, Trash2, Shield, ArrowLeft, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { InventoryItem, ItemStatus, CartItem } from './types';
+import { InventoryItem, ItemStatus, CartItem, BorrowLog } from './types';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<'catalog' | 'admin'>('catalog');
@@ -27,7 +27,7 @@ export default function App() {
   // State untuk Keranjang Peminjaman
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [returnConfirmItem, setReturnConfirmItem] = useState<InventoryItem | null>(null);
+  const [returnConfirmData, setReturnConfirmData] = useState<{item: InventoryItem, logId: string} | null>(null);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -102,21 +102,50 @@ export default function App() {
         }
 
         const items = result.data?.allInventoryItems || [];
-        const formattedData: InventoryItem[] = items.map((item: any) => ({
-          id: item.id,
-          name: item.name || 'Tanpa Nama',
-          category: item.category || 'Lain-lain',
-          status: item.statusItem || 'Tersedia',
-          location: item.location || '-',
-          imageUrl: item.image?.url || 'https://via.placeholder.com/400x300?text=Tidak+Ada+Foto',
-          description: item.description || '', 
-          availableQuantity: item.availablequantity || 0, 
-          totalQuantity: item.totalquantity || 0,
-          borrowerInfo: item.borrowerinfo || '',
-          borrowDate: item.borrowdate || '',
-          expectedReturnDate: item.expectedreturndate || '',
-          allowPartialBorrowing: item.allowpartialborrowing !== false, // default to true if undefined
-        }));
+        const formattedData: InventoryItem[] = items.map((item: any) => {
+          let borrowLogs: BorrowLog[] = [];
+          try {
+            if (item.borrowerinfo && item.borrowerinfo.startsWith('[')) {
+              borrowLogs = JSON.parse(item.borrowerinfo);
+            } else if (item.borrowerinfo) {
+              borrowLogs = [{
+                id: Math.random().toString(36).substr(2, 9),
+                borrowerName: item.borrowerinfo,
+                quantity: item.totalquantity - item.availablequantity,
+                borrowDate: item.borrowdate || '',
+                expectedReturnDate: item.expectedreturndate || ''
+              }];
+            }
+          } catch (e) {
+            console.error("Failed to parse borrowerinfo", e);
+            if (item.borrowerinfo) {
+              borrowLogs = [{
+                id: Math.random().toString(36).substr(2, 9),
+                borrowerName: item.borrowerinfo,
+                quantity: item.totalquantity - item.availablequantity,
+                borrowDate: item.borrowdate || '',
+                expectedReturnDate: item.expectedreturndate || ''
+              }];
+            }
+          }
+
+          return {
+            id: item.id,
+            name: item.name || 'Tanpa Nama',
+            category: item.category || 'Lain-lain',
+            status: item.statusItem || 'Tersedia',
+            location: item.location || '-',
+            imageUrl: item.image?.url || 'https://via.placeholder.com/400x300?text=Tidak+Ada+Foto',
+            description: item.description || '', 
+            availableQuantity: item.availablequantity || 0, 
+            totalQuantity: item.totalquantity || 0,
+            borrowerInfo: item.borrowerinfo || '',
+            borrowLogs,
+            borrowDate: item.borrowdate || '',
+            expectedReturnDate: item.expectedreturndate || '',
+            allowPartialBorrowing: item.allowpartialborrowing !== false, // default to true if undefined
+          };
+        });
         
         setInventoryData(formattedData);
       } catch (error) {
@@ -266,42 +295,50 @@ export default function App() {
     }
   };
 
-  const handleReturnItem = (item: InventoryItem) => {
-    setReturnConfirmItem(item);
+  const handleReturnItem = (item: InventoryItem, logId: string) => {
+    setReturnConfirmData({ item, logId });
   };
 
   const confirmReturnAction = async () => {
-    if (!returnConfirmItem) return;
+    if (!returnConfirmData) return;
     
-    const item = returnConfirmItem;
+    const { item, logId } = returnConfirmData;
     // Update local inventory data
     const updatedInventory = inventoryData.map(i => {
       if (i.id === item.id) {
-        const newStatus = 'Tersedia';
+        const logToRemove = i.borrowLogs?.find(l => l.id === logId);
+        if (!logToRemove) return i;
+
+        const newAvailable = Math.min(i.totalQuantity, i.availableQuantity + logToRemove.quantity);
+        const newStatus = newAvailable === 0 ? 'Dipinjam' : 'Tersedia';
+        const newBorrowLogs = i.borrowLogs?.filter(l => l.id !== logId) || [];
+        const newBorrowerInfoString = newBorrowLogs.length > 0 ? JSON.stringify(newBorrowLogs) : '';
+        const latestLog = newBorrowLogs.length > 0 ? newBorrowLogs[newBorrowLogs.length - 1] : null;
         
         // Update to DatoCMS
         updateDatoCMSItem(
           item.id,
-          item.totalQuantity,
+          newAvailable,
           newStatus,
-          '',
-          null,
-          null
+          newBorrowerInfoString,
+          latestLog ? latestLog.borrowDate : null,
+          latestLog ? latestLog.expectedReturnDate : null
         );
         
         return {
           ...i,
-          availableQuantity: item.totalQuantity,
+          availableQuantity: newAvailable,
           status: newStatus,
-          borrowerInfo: '',
-          borrowDate: '',
-          expectedReturnDate: '',
+          borrowerInfo: newBorrowerInfoString,
+          borrowLogs: newBorrowLogs,
+          borrowDate: latestLog ? latestLog.borrowDate : '',
+          expectedReturnDate: latestLog ? latestLog.expectedReturnDate : '',
         };
       }
       return i;
     });
     setInventoryData(updatedInventory);
-    setReturnConfirmItem(null);
+    setReturnConfirmData(null);
   };
 
   const confirmQuantityAction = () => {
@@ -333,12 +370,22 @@ export default function App() {
           const newAvailable = item.availableQuantity - finalQty;
           const newStatus = newAvailable === 0 ? 'Dipinjam' : 'Tersedia';
           
+          const newLog: BorrowLog = {
+            id: Math.random().toString(36).substr(2, 9),
+            borrowerName: tempBorrowerName,
+            quantity: finalQty,
+            borrowDate: borrowDate,
+            expectedReturnDate: expectedReturnDate
+          };
+          const newBorrowLogs = [...(item.borrowLogs || []), newLog];
+          const newBorrowerInfoString = JSON.stringify(newBorrowLogs);
+          
           // Update to DatoCMS
           updateDatoCMSItem(
             item.id,
             newAvailable,
             newStatus,
-            tempBorrowerName,
+            newBorrowerInfoString,
             borrowDate,
             expectedReturnDate
           );
@@ -347,7 +394,8 @@ export default function App() {
             ...item,
             availableQuantity: newAvailable,
             status: newStatus,
-            borrowerInfo: tempBorrowerName,
+            borrowerInfo: newBorrowerInfoString,
+            borrowLogs: newBorrowLogs,
             borrowDate: borrowDate,
             expectedReturnDate: expectedReturnDate,
           };
@@ -385,12 +433,22 @@ export default function App() {
         const newStatus = newAvailable === 0 ? 'Dipinjam' : 'Tersedia';
         const finalBorrowerName = cartItem.borrowerName || borrowerName;
         
+        const newLog: BorrowLog = {
+          id: Math.random().toString(36).substr(2, 9),
+          borrowerName: finalBorrowerName,
+          quantity: cartItem.borrowQuantity,
+          borrowDate: borrowDate,
+          expectedReturnDate: expectedReturnDate
+        };
+        const newBorrowLogs = [...(item.borrowLogs || []), newLog];
+        const newBorrowerInfoString = JSON.stringify(newBorrowLogs);
+        
         // Update to DatoCMS
         updateDatoCMSItem(
           item.id,
           newAvailable,
           newStatus,
-          finalBorrowerName,
+          newBorrowerInfoString,
           borrowDate,
           expectedReturnDate
         );
@@ -399,7 +457,8 @@ export default function App() {
           ...item,
           availableQuantity: newAvailable,
           status: newStatus,
-          borrowerInfo: finalBorrowerName,
+          borrowerInfo: newBorrowerInfoString,
+          borrowLogs: newBorrowLogs,
           borrowDate: borrowDate,
           expectedReturnDate: expectedReturnDate,
         };
@@ -518,7 +577,7 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {inventoryData.filter(item => item.status === 'Dipinjam' || item.borrowerInfo).length === 0 ? (
+                    {inventoryData.flatMap(item => (item.borrowLogs || []).map(log => ({ item, log }))).length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           Tidak ada barang yang sedang dipinjam.
@@ -526,9 +585,9 @@ export default function App() {
                       </tr>
                     ) : (
                       inventoryData
-                        .filter(item => item.status === 'Dipinjam' || item.borrowerInfo)
-                        .map(item => (
-                          <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                        .flatMap(item => (item.borrowLogs || []).map(log => ({ item, log })))
+                        .map(({ item, log }) => (
+                          <tr key={`${item.id}-${log.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <img src={item.imageUrl} alt={item.name} className="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-800" referrerPolicy="no-referrer" />
@@ -539,17 +598,17 @@ export default function App() {
                               </div>
                             </td>
                             <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                              {item.borrowerInfo || '-'}
+                              {log.borrowerName || '-'}
                             </td>
                             <td className="px-6 py-4">
-                              {item.borrowDate ? new Date(item.borrowDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                              {log.borrowDate ? new Date(log.borrowDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                             </td>
                             <td className="px-6 py-4">
-                              {item.expectedReturnDate ? new Date(item.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                              {log.expectedReturnDate ? new Date(log.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                             </td>
                             <td className="px-6 py-4">
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
-                                {item.totalQuantity - item.availableQuantity} dipinjam
+                                {log.quantity} dipinjam
                               </span>
                             </td>
                             <td className="px-6 py-4">
@@ -559,7 +618,7 @@ export default function App() {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <button
-                                onClick={() => handleReturnItem(item)}
+                                onClick={() => handleReturnItem(item, log.id)}
                                 className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs font-medium rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors"
                               >
                                 Hapus
@@ -1113,7 +1172,7 @@ export default function App() {
 
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  if (adminUsername === 'admin' && adminPassword === 'Inventaris2026') {
+                  if (adminUsername === 'admin' && adminPassword === 'inventaris2026') {
                     setIsAdminAuthenticated(true);
                     setIsAdminLoginOpen(false);
                     setCurrentView('admin');
@@ -1168,14 +1227,14 @@ export default function App() {
 
       {/* Modal Konfirmasi Hapus Log */}
       <AnimatePresence>
-        {returnConfirmItem && (
+        {returnConfirmData && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-              onClick={() => setReturnConfirmItem(null)}
+              onClick={() => setReturnConfirmData(null)}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -1190,7 +1249,7 @@ export default function App() {
                     Konfirmasi Hapus Log
                   </h2>
                   <button 
-                    onClick={() => setReturnConfirmItem(null)}
+                    onClick={() => setReturnConfirmData(null)}
                     className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
                   >
                     <X size={20} />
@@ -1199,7 +1258,7 @@ export default function App() {
 
                 <div className="mb-6">
                   <p className="text-gray-600 dark:text-gray-300">
-                    Apakah Anda yakin ingin menghapus log peminjaman untuk barang <strong>"{returnConfirmItem.name}"</strong>?
+                    Apakah Anda yakin ingin menghapus log peminjaman untuk barang <strong>"{returnConfirmData.item.name}"</strong>?
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                     Data peminjam akan dihapus dan barang akan kembali tersedia. Tindakan ini tidak dapat dibatalkan.
@@ -1208,7 +1267,7 @@ export default function App() {
 
                 <div className="flex gap-3">
                   <button 
-                    onClick={() => setReturnConfirmItem(null)}
+                    onClick={() => setReturnConfirmData(null)}
                     className="flex-1 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     Batal
