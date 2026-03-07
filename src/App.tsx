@@ -27,6 +27,7 @@ export default function App() {
   // State untuk Keranjang Peminjaman
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [returnConfirmItem, setReturnConfirmItem] = useState<InventoryItem | null>(null);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -84,6 +85,7 @@ export default function App() {
                   }
                   location
                   borrowerinfo
+                  borrowdate
                   expectedreturndate
                 }
               }
@@ -180,8 +182,8 @@ export default function App() {
     newAvailableQty: number,
     newStatus: string,
     borrowerName: string,
-    borrowDate: string,
-    expectedReturnDate: string
+    borrowDate: string | null,
+    expectedReturnDate: string | null
   ) => {
     try {
       // 1. Update the item (creates a draft)
@@ -262,6 +264,44 @@ export default function App() {
     } catch (error) {
       console.error("Terjadi kesalahan jaringan saat update DatoCMS:", error);
     }
+  };
+
+  const handleReturnItem = (item: InventoryItem) => {
+    setReturnConfirmItem(item);
+  };
+
+  const confirmReturnAction = async () => {
+    if (!returnConfirmItem) return;
+    
+    const item = returnConfirmItem;
+    // Update local inventory data
+    const updatedInventory = inventoryData.map(i => {
+      if (i.id === item.id) {
+        const newStatus = 'Tersedia';
+        
+        // Update to DatoCMS
+        updateDatoCMSItem(
+          item.id,
+          item.totalQuantity,
+          newStatus,
+          '',
+          null,
+          null
+        );
+        
+        return {
+          ...i,
+          availableQuantity: item.totalQuantity,
+          status: newStatus,
+          borrowerInfo: '',
+          borrowDate: '',
+          expectedReturnDate: '',
+        };
+      }
+      return i;
+    });
+    setInventoryData(updatedInventory);
+    setReturnConfirmItem(null);
   };
 
   const confirmQuantityAction = () => {
@@ -474,12 +514,13 @@ export default function App() {
                       <th className="px-6 py-4">Estimasi Kembali</th>
                       <th className="px-6 py-4">Jumlah</th>
                       <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4 text-right">Hapus Log</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                     {inventoryData.filter(item => item.status === 'Dipinjam' || item.borrowerInfo).length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           Tidak ada barang yang sedang dipinjam.
                         </td>
                       </tr>
@@ -515,6 +556,14 @@ export default function App() {
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
                                 {item.status}
                               </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <button
+                                onClick={() => handleReturnItem(item)}
+                                className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs font-medium rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors"
+                              >
+                                Hapus
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -1064,7 +1113,7 @@ export default function App() {
 
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  if (adminUsername === 'admin' && adminPassword === 'paragita2024') {
+                  if (adminUsername === 'admin' && adminPassword === 'Inventaris2026') {
                     setIsAdminAuthenticated(true);
                     setIsAdminLoginOpen(false);
                     setCurrentView('admin');
@@ -1111,6 +1160,66 @@ export default function App() {
                     Masuk
                   </button>
                 </form>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Konfirmasi Hapus Log */}
+      <AnimatePresence>
+        {returnConfirmItem && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              onClick={() => setReturnConfirmItem(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 overflow-hidden border border-gray-100 dark:border-gray-800"
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Trash2 className="text-rose-600 dark:text-rose-400" size={24} />
+                    Konfirmasi Hapus Log
+                  </h2>
+                  <button 
+                    onClick={() => setReturnConfirmItem(null)}
+                    className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-gray-600 dark:text-gray-300">
+                    Apakah Anda yakin ingin menghapus log peminjaman untuk barang <strong>"{returnConfirmItem.name}"</strong>?
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    Data peminjam akan dihapus dan barang akan kembali tersedia. Tindakan ini tidak dapat dibatalkan.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setReturnConfirmItem(null)}
+                    className="flex-1 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={confirmReturnAction}
+                    className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-colors shadow-sm"
+                  >
+                    Ya, Hapus Log
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>
