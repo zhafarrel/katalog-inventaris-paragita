@@ -11,5 +11,12 @@ export interface InventoryItem {
   imageUrl: string;
   location: string;
   borrowerInfo?: string;
+  borrowDate?: string;
   expectedReturnDate?: string;
+  allowPartialBorrowing?: boolean;
+}
+
+export interface CartItem extends InventoryItem {
+  borrowQuantity: number;
+  borrowerName?: string;
 }

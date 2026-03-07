@@ -1,19 +1,31 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon, Loader2, ShoppingCart, Trash2 } from 'lucide-react';
+import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon, Loader2, ShoppingCart, Trash2, Shield, ArrowLeft, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { InventoryItem, ItemStatus } from './types';
+import { InventoryItem, ItemStatus, CartItem } from './types';
 
 export default function App() {
+  const [currentView, setCurrentView] = useState<'catalog' | 'admin'>('catalog');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [sortBy, setSortBy] = useState<string>('Terbaru');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   
+  const [quantityModalItem, setQuantityModalItem] = useState<InventoryItem | null>(null);
+  const [quantityModalAction, setQuantityModalAction] = useState<'cart' | 'checkout' | null>(null);
+  const [tempQuantity, setTempQuantity] = useState<number | string>(1);
+  const [tempBorrowerName, setTempBorrowerName] = useState<string>('');
+  
   const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // State untuk Keranjang Peminjaman
-  const [cart, setCart] = useState<InventoryItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -30,6 +42,20 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    if (quantityModalItem) {
+      const cartItem = cart.find(i => i.id === quantityModalItem.id);
+      if (cartItem) {
+        setTempQuantity(cartItem.borrowQuantity);
+        setTempBorrowerName(cartItem.borrowerName || tempBorrowerName);
+      } else if (!quantityModalItem.allowPartialBorrowing && quantityModalItem.availableQuantity === quantityModalItem.totalQuantity) {
+        setTempQuantity(quantityModalItem.totalQuantity);
+      } else {
+        setTempQuantity(1);
+      }
+    }
+  }, [quantityModalItem, cart]);
 
   // Mengambil data dari DatoCMS
   useEffect(() => {
@@ -68,7 +94,7 @@ export default function App() {
         const result = await response.json();
         
         if (result.errors) {
-          console.error("Error dari DatoCMS:", result.errors);
+          console.error("Error dari DatoCMS:", JSON.stringify(result.errors, null, 2));
           setIsLoading(false);
           return;
         }
@@ -85,7 +111,9 @@ export default function App() {
           availableQuantity: item.availablequantity || 0, 
           totalQuantity: item.totalquantity || 0,
           borrowerInfo: item.borrowerinfo || '',
+          borrowDate: item.borrowdate || '',
           expectedReturnDate: item.expectedreturndate || '',
+          allowPartialBorrowing: item.allowpartialborrowing !== false, // default to true if undefined
         }));
         
         setInventoryData(formattedData);
@@ -133,17 +161,168 @@ export default function App() {
     if (cart.find(i => i.id === item.id)) {
       setCart(cart.filter(i => i.id !== item.id));
     } else {
-      setCart([...cart, item]);
+      handleActionWithQuantity(item, 'cart');
     }
+  };
+
+  const handleActionWithQuantity = (item: InventoryItem, action: 'cart' | 'checkout') => {
+    setQuantityModalItem(item);
+    setQuantityModalAction(action);
+    if (!item.allowPartialBorrowing) {
+      setTempQuantity(item.totalQuantity);
+    } else {
+      setTempQuantity(1);
+    }
+  };
+
+  const updateDatoCMSItem = async (
+    itemId: string,
+    newAvailableQty: number,
+    newStatus: string,
+    borrowerName: string,
+    borrowDate: string,
+    expectedReturnDate: string
+  ) => {
+    try {
+      const response = await fetch(`https://site-api.datocms.com/items/${itemId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer bcfd3c1a0dda45c7999f046df54ad5`,
+          'X-Api-Version': '3',
+          'Accept': 'application/json',
+          'Content-Type': 'application/vnd.api+json'
+        },
+        body: JSON.stringify({
+          data: {
+            id: itemId,
+            type: 'item',
+            attributes: {
+              availablequantity: newAvailableQty,
+              statusitem: newStatus,
+              borrowerinfo: borrowerName,
+              borrowdate: borrowDate,
+              expectedreturndate: expectedReturnDate
+            }
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Gagal update DatoCMS:", errorData);
+      } else {
+        console.log(`Berhasil update item ${itemId} di DatoCMS!`);
+      }
+    } catch (error) {
+      console.error("Terjadi kesalahan jaringan saat update DatoCMS:", error);
+    }
+  };
+
+  const confirmQuantityAction = () => {
+    if (!quantityModalItem || !quantityModalAction) return;
+    
+    if (!tempBorrowerName.trim()) {
+      alert("Mohon isi nama peminjam terlebih dahulu.");
+      return;
+    }
+    
+    const qty = typeof tempQuantity === 'number' ? tempQuantity : parseInt(tempQuantity, 10) || 1;
+    const finalQty = Math.max(1, Math.min(quantityModalItem.availableQuantity, qty));
+
+    if (quantityModalAction === 'cart') {
+      if (!cart.some(i => i.id === quantityModalItem.id)) {
+        setCart([...cart, { ...quantityModalItem, borrowQuantity: finalQty, borrowerName: tempBorrowerName }]);
+      }
+    } else {
+      const phoneNumber = "6281218795969"; 
+      const message = `Halo pengurus Invent, saya ingin meminjam barang berikut:\n\nNama Peminjam: *${tempBorrowerName}*\nNama Barang: *${quantityModalItem.name}*\nJumlah: *${finalQty} buah*\nKategori: *${quantityModalItem.category}*\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+      
+      // Update local inventory data to reflect the borrowing
+      const borrowDate = new Date().toISOString();
+      const expectedReturnDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Default 7 days
+      
+      const updatedInventory = inventoryData.map(item => {
+        if (item.id === quantityModalItem.id) {
+          const newAvailable = item.availableQuantity - finalQty;
+          const newStatus = newAvailable === 0 ? 'Dipinjam' : 'Tersedia';
+          
+          // Update to DatoCMS
+          updateDatoCMSItem(
+            item.id,
+            newAvailable,
+            newStatus,
+            tempBorrowerName,
+            borrowDate,
+            expectedReturnDate
+          );
+          
+          return {
+            ...item,
+            availableQuantity: newAvailable,
+            status: newStatus,
+            borrowerInfo: tempBorrowerName,
+            borrowDate: borrowDate,
+            expectedReturnDate: expectedReturnDate,
+          };
+        }
+        return item;
+      });
+      setInventoryData(updatedInventory);
+      
+      window.open(whatsappUrl, '_blank');
+    }
+    
+    setQuantityModalItem(null);
+    setQuantityModalAction(null);
   };
 
   // Fungsi untuk checkout via WhatsApp
   const handleCheckout = () => {
     if (cart.length === 0) return;
     const phoneNumber = "6281218795969"; 
-    const itemList = cart.map((item, index) => `${index + 1}. *${item.name}* (${item.category})`).join('\n');
-    const message = `Halo pengurus Invent, saya ingin meminjam barang-barang berikut:\n\n${itemList}\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
+    const borrowerName = cart[0].borrowerName || "Peminjam";
+    const itemList = cart.map((item, index) => `${index + 1}. *${item.name}* (${item.borrowQuantity} buah)`).join('\n');
+    const message = `Halo pengurus Invent, saya *${borrowerName}* ingin meminjam barang-barang berikut:\n\n${itemList}\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    
+    // Update local inventory data to reflect the borrowing
+    const updatedInventory = [...inventoryData];
+    const borrowDate = new Date().toISOString();
+    const expectedReturnDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Default 7 days
+    
+    cart.forEach(cartItem => {
+      const index = updatedInventory.findIndex(i => i.id === cartItem.id);
+      if (index !== -1) {
+        const item = updatedInventory[index];
+        const newAvailable = item.availableQuantity - cartItem.borrowQuantity;
+        const newStatus = newAvailable === 0 ? 'Dipinjam' : 'Tersedia';
+        const finalBorrowerName = cartItem.borrowerName || borrowerName;
+        
+        // Update to DatoCMS
+        updateDatoCMSItem(
+          item.id,
+          newAvailable,
+          newStatus,
+          finalBorrowerName,
+          borrowDate,
+          expectedReturnDate
+        );
+        
+        updatedInventory[index] = {
+          ...item,
+          availableQuantity: newAvailable,
+          status: newStatus,
+          borrowerInfo: finalBorrowerName,
+          borrowDate: borrowDate,
+          expectedReturnDate: expectedReturnDate,
+        };
+      }
+    });
+    setInventoryData(updatedInventory);
+    setCart([]);
+    setIsCartOpen(false);
+    
     window.open(whatsappUrl, '_blank');
   };
 
@@ -196,17 +375,116 @@ export default function App() {
               >
                 {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
               </button>
+
+              <button 
+                onClick={() => {
+                  if (currentView === 'catalog') {
+                    if (isAdminAuthenticated) {
+                      setCurrentView('admin');
+                    } else {
+                      setIsAdminLoginOpen(true);
+                      setLoginError('');
+                    }
+                  } else {
+                    setCurrentView('catalog');
+                  }
+                }}
+                className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                aria-label="Admin Dashboard"
+                title="Admin Dashboard"
+              >
+                {currentView === 'catalog' ? <Shield size={20} /> : <Package size={20} />}
+              </button>
             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
-            <Filter className="h-5 w-5 text-gray-400 dark:text-gray-500 mr-2 flex-shrink-0" />
-            {categories.map(category => (
+        {currentView === 'admin' ? (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Log Peminjaman</h2>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">Daftar barang yang sedang dipinjam saat ini.</p>
+              </div>
               <button
+                onClick={() => setCurrentView('catalog')}
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <ArrowLeft size={16} />
+                Kembali ke Katalog
+              </button>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-600 dark:text-gray-400">
+                  <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 text-xs uppercase font-semibold border-b border-gray-200 dark:border-gray-800">
+                    <tr>
+                      <th className="px-6 py-4">Barang</th>
+                      <th className="px-6 py-4">Peminjam</th>
+                      <th className="px-6 py-4">Tgl Pinjam</th>
+                      <th className="px-6 py-4">Estimasi Kembali</th>
+                      <th className="px-6 py-4">Jumlah</th>
+                      <th className="px-6 py-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                    {inventoryData.filter(item => item.status === 'Dipinjam' || item.borrowerInfo).length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                          Tidak ada barang yang sedang dipinjam.
+                        </td>
+                      </tr>
+                    ) : (
+                      inventoryData
+                        .filter(item => item.status === 'Dipinjam' || item.borrowerInfo)
+                        .map(item => (
+                          <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <img src={item.imageUrl} alt={item.name} className="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-800" referrerPolicy="no-referrer" />
+                                <div>
+                                  <div className="font-medium text-gray-900 dark:text-white">{item.name}</div>
+                                  <div className="text-xs text-gray-500">{item.category}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                              {item.borrowerInfo || '-'}
+                            </td>
+                            <td className="px-6 py-4">
+                              {item.borrowDate ? new Date(item.borrowDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                            </td>
+                            <td className="px-6 py-4">
+                              {item.expectedReturnDate ? new Date(item.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
+                                {item.totalQuantity - item.availableQuantity} dipinjam
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                                {item.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+                <Filter className="h-5 w-5 text-gray-400 dark:text-gray-500 mr-2 flex-shrink-0" />
+                {categories.map(category => (
+                  <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
@@ -302,6 +580,8 @@ export default function App() {
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">Barang tidak ditemukan</h3>
             <p className="text-gray-500 dark:text-gray-400 mt-1">Belum ada barang di kategori ini, atau kata kunci tidak cocok.</p>
           </div>
+        )}
+        </>
         )}
       </main>
 
@@ -400,6 +680,14 @@ export default function App() {
                   </div>
                 )}
 
+                {selectedItem.status === 'Tersedia' && !selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity && (
+                  <div className="mt-6 mb-8 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                    <div className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 p-3 rounded-lg border border-rose-100 dark:border-rose-800/50">
+                      Barang ini harus dipinjam satu set utuh ({selectedItem.totalQuantity} buah), namun saat ini ada bagian yang sedang dipinjam.
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Cara Meminjam</h4>
                   <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-decimal list-inside">
@@ -419,9 +707,9 @@ export default function App() {
                   Tutup
                 </button>
                 <button 
-                  disabled={selectedItem.status !== 'Tersedia'}
+                  disabled={selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)}
                   className={`p-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors flex items-center justify-center ${
-                    selectedItem.status !== 'Tersedia'
+                    selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)
                       ? 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
                       : cart.some(i => i.id === selectedItem.id)
                         ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800/50'
@@ -433,21 +721,170 @@ export default function App() {
                   <ShoppingCart size={20} />
                 </button>
                 <button 
-                  disabled={selectedItem.status !== 'Tersedia'}
+                  disabled={selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)}
                   className={`px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors ${
-                    selectedItem.status === 'Tersedia'
+                    selectedItem.status === 'Tersedia' && !(!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)
                       ? 'text-white bg-indigo-600 hover:bg-indigo-700'
                       : 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
                   }`}
                   onClick={() => {
-                    const phoneNumber = "6281218795969"; 
-                    const message = `Halo pengurus Invent, saya ingin meminjam barang berikut:\n\nNama Barang: *${selectedItem.name}*\nKategori: *${selectedItem.category}*\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
-                    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-                    window.open(whatsappUrl, '_blank');
+                    handleActionWithQuantity(selectedItem, 'checkout');
+                    setSelectedItem(null);
                   }}
                 >
                   Ajukan Peminjaman
                 </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Pilih Jumlah Peminjaman */}
+      <AnimatePresence>
+        {quantityModalItem && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              onClick={() => {
+                setQuantityModalItem(null);
+                setQuantityModalAction(null);
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 overflow-hidden border border-gray-100 dark:border-gray-800"
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Package className="text-indigo-600 dark:text-indigo-400" size={24} />
+                    Jumlah Peminjaman
+                  </h2>
+                  <button 
+                    onClick={() => {
+                      setQuantityModalItem(null);
+                      setQuantityModalAction(null);
+                    }}
+                    className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <img src={quantityModalItem.imageUrl} alt={quantityModalItem.name} className="w-12 h-12 rounded-lg object-cover bg-gray-100 dark:bg-gray-800" referrerPolicy="no-referrer" />
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{quantityModalItem.name}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Tersedia: {quantityModalItem.availableQuantity} buah</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Nama Peminjam
+                      </label>
+                      <input 
+                        type="text" 
+                        value={tempBorrowerName}
+                        onChange={(e) => setTempBorrowerName(e.target.value)}
+                        placeholder="Masukkan nama Anda"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      />
+                    </div>
+
+                    {quantityModalItem.allowPartialBorrowing ? (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Tentukan Jumlah
+                          </label>
+                          <div className="flex items-center gap-4">
+                            <button 
+                              onClick={() => setTempQuantity(1)}
+                              className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              Min
+                            </button>
+                            <input 
+                              type="number" 
+                              min="1"
+                              max={quantityModalItem.availableQuantity}
+                              value={tempQuantity}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                  setTempQuantity('');
+                                } else {
+                                  const num = parseInt(val, 10);
+                                  if (!isNaN(num)) {
+                                    setTempQuantity(Math.max(1, Math.min(quantityModalItem.availableQuantity, num)));
+                                  }
+                                }
+                              }}
+                              onBlur={() => {
+                                if (tempQuantity === '' || isNaN(Number(tempQuantity))) {
+                                  setTempQuantity(1);
+                                }
+                              }}
+                              className="flex-grow px-4 py-2 text-center text-lg font-bold border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                            />
+                            <button 
+                              onClick={() => setTempQuantity(quantityModalItem.availableQuantity)}
+                              className="px-3 py-1.5 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              Max
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <input 
+                            type="range" 
+                            min="1" 
+                            max={quantityModalItem.availableQuantity} 
+                            value={tempQuantity === '' ? 1 : tempQuantity} 
+                            onChange={(e) => setTempQuantity(parseInt(e.target.value, 10))}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-indigo-600"
+                          />
+                          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            <span>1</span>
+                            <span>{quantityModalItem.availableQuantity}</span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 p-3 rounded-lg border border-rose-100 dark:border-rose-800/50">
+                        Barang ini harus dipinjam satu set utuh ({quantityModalItem.totalQuantity} buah).
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => {
+                      setQuantityModalItem(null);
+                      setQuantityModalAction(null);
+                    }}
+                    className="flex-1 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={confirmQuantityAction}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors shadow-sm"
+                  >
+                    Konfirmasi
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>
@@ -513,6 +950,9 @@ export default function App() {
                         <div className="flex-grow min-w-0">
                           <h4 className="font-semibold text-gray-900 dark:text-white text-sm truncate">{item.name}</h4>
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.category}</p>
+                          <div className="mt-1 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                            Jumlah: {item.borrowQuantity} buah
+                          </div>
                         </div>
                         <button 
                           onClick={() => toggleCartItem(item)} 
@@ -539,6 +979,92 @@ export default function App() {
                 >
                   Ajukan Peminjaman via WA
                 </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Login Admin */}
+      <AnimatePresence>
+        {isAdminLoginOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              onClick={() => setIsAdminLoginOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 overflow-hidden border border-gray-100 dark:border-gray-800"
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Shield className="text-indigo-600 dark:text-indigo-400" size={24} />
+                    Login Admin
+                  </h2>
+                  <button 
+                    onClick={() => setIsAdminLoginOpen(false)}
+                    className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (adminUsername === 'admin' && adminPassword === 'inventaris2026') {
+                    setIsAdminAuthenticated(true);
+                    setIsAdminLoginOpen(false);
+                    setCurrentView('admin');
+                    setAdminUsername('');
+                    setAdminPassword('');
+                    setLoginError('');
+                  } else {
+                    setLoginError('Username atau password salah!');
+                  }
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                    <input 
+                      type="text" 
+                      value={adminUsername}
+                      onChange={(e) => setAdminUsername(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      placeholder="Masukkan username"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                    <input 
+                      type="password" 
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      placeholder="Masukkan password"
+                      required
+                    />
+                  </div>
+                  
+                  {loginError && (
+                    <div className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 p-3 rounded-lg border border-rose-100 dark:border-rose-800/50">
+                      {loginError}
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit"
+                    className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors shadow-sm"
+                  >
+                    Masuk
+                  </button>
+                </form>
               </div>
             </motion.div>
           </>
