@@ -1180,7 +1180,7 @@ export default function App() {
 
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  if (adminUsername === 'admin' && adminPassword === 'paragita2024') {
+                  if (adminUsername === 'admin' && adminPassword === 'inventaris2026') {
                     setIsAdminAuthenticated(true);
                     setIsAdminLoginOpen(false);
                     setCurrentView('admin');
