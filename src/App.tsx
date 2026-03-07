@@ -754,9 +754,9 @@ export default function App() {
               initial={{ opacity: 0, y: 100, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 100, scale: 0.95 }}
-              className="fixed inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-2xl bg-white dark:bg-gray-900 md:rounded-3xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[100dvh] md:max-h-[90vh]"
+              className="fixed inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[90vw] md:max-w-4xl bg-white dark:bg-gray-900 md:rounded-3xl shadow-2xl z-50 overflow-hidden flex flex-col md:flex-row max-h-[100dvh] md:max-h-[85vh]"
             >
-              <div className="relative h-64 md:h-72 flex-shrink-0 bg-gray-100 dark:bg-gray-800">
+              <div className="relative h-64 md:h-auto md:w-1/2 flex-shrink-0 bg-gray-100 dark:bg-gray-800">
                 <img 
                   src={selectedItem.imageUrl} 
                   alt={selectedItem.name} 
@@ -765,129 +765,137 @@ export default function App() {
                 />
                 <button 
                   onClick={() => setSelectedItem(null)}
-                  className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 dark:bg-black/40 dark:hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors"
+                  className="absolute top-4 right-4 md:hidden p-2 bg-black/20 hover:bg-black/40 dark:bg-black/40 dark:hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors"
                 >
                   <X size={20} />
                 </button>
               </div>
               
-              <div className="p-6 md:p-8 overflow-y-auto flex-grow">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div>
-                    <div className="text-sm font-medium text-indigo-600 dark:text-indigo-400 mb-1 uppercase tracking-wider">{selectedItem.category}</div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedItem.name}</h2>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-semibold border whitespace-nowrap ${getStatusColor(selectedItem.status)}`}>
-                    {selectedItem.status}
-                  </span>
-                </div>
-
-                {selectedItem.description && (
-                  <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
-                    {selectedItem.description}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 mt-4">
-                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 flex items-start gap-3">
-                    <Package className="text-gray-400 dark:text-gray-500 mt-0.5" size={20} />
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">Kuantitas</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{selectedItem.availableQuantity} dari {selectedItem.totalQuantity} tersedia</div>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 flex items-start gap-3">
-                    <MapPin className="text-gray-400 dark:text-gray-500 mt-0.5" size={20} />
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">Lokasi Penyimpanan</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{selectedItem.location}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {selectedItem.status !== 'Tersedia' && (
-                  <div className={`p-4 rounded-xl border mb-8 ${
-                    selectedItem.status === 'Dipinjam' 
-                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50' 
-                      : 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-900/50'
-                  }`}>
-                    <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
-                      selectedItem.status === 'Dipinjam' ? 'text-amber-800 dark:text-amber-400' : 'text-rose-800 dark:text-rose-400'
-                    }`}>
-                      <Info size={16} />
-                      Informasi {selectedItem.status}
-                    </h4>
-                    <div className="space-y-2">
-                      {selectedItem.borrowerInfo && (
-                        <div className="flex items-start gap-2 text-sm">
-                          <User size={16} className={selectedItem.status === 'Dipinjam' ? 'text-amber-600 dark:text-amber-500' : 'text-rose-600 dark:text-rose-500'} />
-                          <span className="text-gray-700 dark:text-gray-300">{selectedItem.borrowerInfo}</span>
-                        </div>
-                      )}
-                      {selectedItem.expectedReturnDate && (
-                        <div className="flex items-start gap-2 text-sm">
-                          <Calendar size={16} className={selectedItem.status === 'Dipinjam' ? 'text-amber-600 dark:text-amber-500' : 'text-rose-600 dark:text-rose-500'} />
-                          <span className="text-gray-700 dark:text-gray-300">Estimasi kembali: <span className="font-medium text-gray-900 dark:text-white">{new Date(selectedItem.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span></span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {selectedItem.status === 'Tersedia' && !selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity && (
-                  <div className="mt-6 mb-8 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
-                    <div className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 p-3 rounded-lg border border-rose-100 dark:border-rose-800/50">
-                      Barang ini harus dipinjam satu set utuh ({selectedItem.totalQuantity} buah), namun saat ini ada bagian yang sedang dipinjam.
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Cara Meminjam</h4>
-                  <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-decimal list-inside">
-                    <li>Pastikan status barang <strong className="text-gray-900 dark:text-white">Tersedia</strong>.</li>
-                    <li>Klik tombol "Tambah ke Keranjang" di bawah.</li>
-                    <li>Buka Keranjang di pojok kanan atas untuk melihat daftar barang.</li>
-                    <li>Klik "Ajukan Peminjaman via WA" untuk mengonfirmasi ke pengurus.</li>
-                  </ol>
-                </div>
-              </div>
-              
-              <div className="p-4 md:p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 flex justify-end gap-3">
+              <div className="flex flex-col md:w-1/2 overflow-hidden relative">
                 <button 
                   onClick={() => setSelectedItem(null)}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="hidden md:flex absolute top-4 right-4 p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors z-10"
                 >
-                  Tutup
+                  <X size={20} />
                 </button>
-                <button 
-                  disabled={selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)}
-                  className={`p-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors flex items-center justify-center ${
-                    selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)
-                      ? 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
-                      : cart.some(i => i.id === selectedItem.id)
-                        ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800/50'
-                        : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/50'
-                  }`}
-                  onClick={() => toggleCartItem(selectedItem)}
-                  title={cart.some(i => i.id === selectedItem.id) ? "Hapus dari Keranjang" : "Tambah ke Keranjang"}
-                >
-                  <ShoppingCart size={20} />
-                </button>
-                <button 
-                  disabled={selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors ${
-                    selectedItem.status === 'Tersedia' && !(!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)
-                      ? 'text-white bg-indigo-600 hover:bg-indigo-700'
-                      : 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
-                  }`}
-                  onClick={() => {
-                    handleActionWithQuantity(selectedItem, 'checkout');
-                    setSelectedItem(null);
-                  }}
-                >
-                  Ajukan Peminjaman
-                </button>
+                <div className="p-6 md:p-8 overflow-y-auto flex-grow">
+                  <div className="flex items-start justify-between gap-4 mb-4 pr-8">
+                    <div>
+                      <div className="text-sm font-medium text-indigo-600 dark:text-indigo-400 mb-1 uppercase tracking-wider">{selectedItem.category}</div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedItem.name}</h2>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold border whitespace-nowrap ${getStatusColor(selectedItem.status)}`}>
+                      {selectedItem.status}
+                    </span>
+                  </div>
+
+                  {selectedItem.description && (
+                    <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
+                      {selectedItem.description}
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-4 mb-8 mt-4">
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 flex items-start gap-3">
+                      <Package className="text-gray-400 dark:text-gray-500 mt-0.5" size={20} />
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">Kuantitas</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{selectedItem.availableQuantity} dari {selectedItem.totalQuantity} tersedia</div>
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 flex items-start gap-3">
+                      <MapPin className="text-gray-400 dark:text-gray-500 mt-0.5" size={20} />
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">Lokasi Penyimpanan</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{selectedItem.location}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedItem.status !== 'Tersedia' && (
+                    <div className={`p-4 rounded-xl border mb-8 ${
+                      selectedItem.status === 'Dipinjam' 
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50' 
+                        : 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-900/50'
+                    }`}>
+                      <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
+                        selectedItem.status === 'Dipinjam' ? 'text-amber-800 dark:text-amber-400' : 'text-rose-800 dark:text-rose-400'
+                      }`}>
+                        <Info size={16} />
+                        Informasi {selectedItem.status}
+                      </h4>
+                      <div className="space-y-2">
+                        {selectedItem.borrowerInfo && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <User size={16} className={selectedItem.status === 'Dipinjam' ? 'text-amber-600 dark:text-amber-500' : 'text-rose-600 dark:text-rose-500'} />
+                            <span className="text-gray-700 dark:text-gray-300">{selectedItem.borrowerInfo}</span>
+                          </div>
+                        )}
+                        {selectedItem.expectedReturnDate && (
+                          <div className="flex items-start gap-2 text-sm">
+                            <Calendar size={16} className={selectedItem.status === 'Dipinjam' ? 'text-amber-600 dark:text-amber-500' : 'text-rose-600 dark:text-rose-500'} />
+                            <span className="text-gray-700 dark:text-gray-300">Estimasi kembali: <span className="font-medium text-gray-900 dark:text-white">{new Date(selectedItem.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span></span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedItem.status === 'Tersedia' && !selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity && (
+                    <div className="mt-6 mb-8 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                      <div className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 p-3 rounded-lg border border-rose-100 dark:border-rose-800/50">
+                        Barang ini harus dipinjam satu set utuh ({selectedItem.totalQuantity} buah), namun saat ini ada bagian yang sedang dipinjam.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Cara Meminjam</h4>
+                    <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-decimal list-inside">
+                      <li>Pastikan status barang <strong className="text-gray-900 dark:text-white">Tersedia</strong>.</li>
+                      <li>Klik tombol "Tambah ke Keranjang" di bawah.</li>
+                      <li>Buka Keranjang di pojok kanan atas untuk melihat daftar barang.</li>
+                      <li>Klik "Ajukan Peminjaman via WA" untuk mengonfirmasi ke pengurus.</li>
+                    </ol>
+                  </div>
+                </div>
+                
+                <div className="p-4 md:p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 flex justify-end gap-3 flex-shrink-0">
+                  <button 
+                    onClick={() => setSelectedItem(null)}
+                    className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Tutup
+                  </button>
+                  <button 
+                    disabled={selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)}
+                    className={`p-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors flex items-center justify-center ${
+                      selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)
+                        ? 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
+                        : cart.some(i => i.id === selectedItem.id)
+                          ? 'text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800/50'
+                          : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/50'
+                    }`}
+                    onClick={() => toggleCartItem(selectedItem)}
+                    title={cart.some(i => i.id === selectedItem.id) ? "Hapus dari Keranjang" : "Tambah ke Keranjang"}
+                  >
+                    <ShoppingCart size={20} />
+                  </button>
+                  <button 
+                    disabled={selectedItem.status !== 'Tersedia' || (!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)}
+                    className={`px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors ${
+                      selectedItem.status === 'Tersedia' && !(!selectedItem.allowPartialBorrowing && selectedItem.availableQuantity < selectedItem.totalQuantity)
+                        ? 'text-white bg-indigo-600 hover:bg-indigo-700'
+                        : 'text-gray-400 bg-gray-200 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
+                    }`}
+                    onClick={() => {
+                      handleActionWithQuantity(selectedItem, 'checkout');
+                      setSelectedItem(null);
+                    }}
+                  >
+                    Ajukan Peminjaman
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>
@@ -1172,7 +1180,7 @@ export default function App() {
 
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  if (adminUsername === 'admin' && adminPassword === 'inventaris2026') {
+                  if (adminUsername === 'admin' && adminPassword === 'paragita2024') {
                     setIsAdminAuthenticated(true);
                     setIsAdminLoginOpen(false);
                     setCurrentView('admin');
