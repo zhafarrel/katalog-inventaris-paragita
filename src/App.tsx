@@ -184,6 +184,7 @@ export default function App() {
     expectedReturnDate: string
   ) => {
     try {
+      // 1. Update the item (creates a draft)
       const response = await fetch(`https://site-api.datocms.com/items/${itemId}`, {
         method: 'PUT',
         headers: {
@@ -198,7 +199,7 @@ export default function App() {
             type: 'item',
             attributes: {
               availablequantity: newAvailableQty,
-              statusitem: newStatus,
+              status_item: newStatus,
               borrowerinfo: borrowerName,
               borrowdate: borrowDate,
               expectedreturndate: expectedReturnDate
@@ -209,10 +210,55 @@ export default function App() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Gagal update DatoCMS:", errorData);
+        console.error("Gagal update DatoCMS:", JSON.stringify(errorData, null, 2));
+        
+        // Coba fallback jika nama fieldnya berbeda (tanpa underscore)
+        if (errorData.data && errorData.data.some((e: any) => e.attributes?.details?.invalid_attributes?.includes('status_item'))) {
+           console.log("Mencoba update ulang dengan nama field alternatif...");
+           await fetch(`https://site-api.datocms.com/items/${itemId}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer bcfd3c1a0dda45c7999f046df54ad5`,
+              'X-Api-Version': '3',
+              'Accept': 'application/json',
+              'Content-Type': 'application/vnd.api+json'
+            },
+            body: JSON.stringify({
+              data: {
+                id: itemId,
+                type: 'item',
+                attributes: {
+                  availablequantity: newAvailableQty,
+                  statusitem: newStatus,
+                  borrowerinfo: borrowerName,
+                  borrowdate: borrowDate,
+                  expectedreturndate: expectedReturnDate
+                }
+              }
+            })
+          });
+        }
       } else {
         console.log(`Berhasil update item ${itemId} di DatoCMS!`);
       }
+
+      // 2. Publish the item so it appears in the public GraphQL API
+      const publishResponse = await fetch(`https://site-api.datocms.com/items/${itemId}/publish`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer bcfd3c1a0dda45c7999f046df54ad5`,
+          'X-Api-Version': '3',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!publishResponse.ok) {
+        const publishError = await publishResponse.json();
+        console.error("Gagal publish DatoCMS:", publishError);
+      } else {
+        console.log(`Berhasil publish item ${itemId}!`);
+      }
+
     } catch (error) {
       console.error("Terjadi kesalahan jaringan saat update DatoCMS:", error);
     }
@@ -1018,7 +1064,7 @@ export default function App() {
 
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  if (adminUsername === 'admin' && adminPassword === 'inventaris2026') {
+                  if (adminUsername === 'admin' && adminPassword === 'paragita2024') {
                     setIsAdminAuthenticated(true);
                     setIsAdminLoginOpen(false);
                     setCurrentView('admin');
