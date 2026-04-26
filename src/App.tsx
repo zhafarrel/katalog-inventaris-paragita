@@ -168,7 +168,7 @@ export default function App() {
             expectedReturnDate: item.expectedreturndate || '',
             allowPartialBorrowing: item.allowpartialborrowing !== false,
             subcategory: item.subcategory || (item.category?.trim().toUpperCase() === 'KOSTUM' ? (item.name.toLowerCase().includes('celana') ? 'Celana' : item.name.toLowerCase().includes('outer') ? 'Outer' : (item.name.toLowerCase().includes('kalung') || item.name.toLowerCase().includes('topi')) ? 'Aksesoris' : 'Baju') : undefined),
-            gender: (item.gender === 'lakilaki' ? 'L' : item.gender === 'perempuan' ? 'P' : item.gender) || (item.category?.trim().toUpperCase() === 'KOSTUM' ? ((item.name.toLowerCase().includes('pria') || item.name.toLowerCase().match(/\bcowok\b/i)) ? 'L' : (item.name.toLowerCase().includes('wanita') || item.name.toLowerCase().match(/\bcewek\b/i) || item.name.toLowerCase().includes('dress') || item.name.toLowerCase().includes('rok') || item.name.toLowerCase().includes('kebaya')) ? 'P' : ((item.id.charCodeAt(0) + item.name.length) % 2 === 0 ? 'L' : 'P')) : undefined),
+            gender: (item.gender === 'lakilaki' ? 'L' : item.gender === 'perempuan' ? 'P' : item.gender) || ((item.category?.trim().toUpperCase() === 'KOSTUM' || item.category?.trim().toUpperCase() === 'AKSESORIS') ? ((item.name.toLowerCase().includes('pria') || item.name.toLowerCase().match(/\bcowok\b/i)) ? 'L' : (item.name.toLowerCase().includes('wanita') || item.name.toLowerCase().match(/\bcewek\b/i) || item.name.toLowerCase().includes('dress') || item.name.toLowerCase().includes('rok') || item.name.toLowerCase().includes('kebaya')) ? 'P' : ((item.id.charCodeAt(0) + item.name.length) % 2 === 0 ? 'L' : 'P')) : undefined),
           };
         });
         
@@ -205,7 +205,7 @@ export default function App() {
       const matchesSubcategory = selectedSubcategory !== 'Semua' 
           ? item.subcategory?.toUpperCase() === selectedSubcategory.toUpperCase() 
           : true;
-      const matchesGender = selectedCategory.trim().toUpperCase() === 'KOSTUM' && selectedGender !== 'Semua'
+      const matchesGender = (selectedCategory.trim().toUpperCase() === 'KOSTUM' || selectedCategory.trim().toUpperCase() === 'AKSESORIS') && selectedGender !== 'Semua'
           ? (selectedGender === 'Laki-laki' ? item.gender === 'L' : selectedGender === 'Perempuan' ? item.gender === 'P' : true)
           : true;
 
@@ -714,7 +714,7 @@ export default function App() {
               </div>
             </div>
 
-            {(availableSubcategories.length > 1 || selectedCategory.trim().toUpperCase() === 'KOSTUM') && (
+            {(availableSubcategories.length > 1 || selectedCategory.trim().toUpperCase() === 'KOSTUM' || selectedCategory.trim().toUpperCase() === 'AKSESORIS') && (
               <div className="flex flex-col sm:flex-row gap-4 mb-6 -mt-2">
                 {availableSubcategories.length > 1 && (
                   <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
@@ -735,7 +735,7 @@ export default function App() {
                   </div>
                 )}
                 
-                {selectedCategory.trim().toUpperCase() === 'KOSTUM' && (
+                {(selectedCategory.trim().toUpperCase() === 'KOSTUM' || selectedCategory.trim().toUpperCase() === 'AKSESORIS') && (
                   <div className={`flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide ${availableSubcategories.length > 1 ? 'border-l border-gray-200 dark:border-gray-700 pl-4' : ''}`}>
                     <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Gender:</span>
                     {['Semua', 'Laki-laki', 'Perempuan'].map(gen => (
@@ -787,7 +787,7 @@ export default function App() {
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
                       />
-                      {(item.category?.trim().toUpperCase() === 'KOSTUM') && item.gender && (
+                      {(item.category?.trim().toUpperCase() === 'KOSTUM' || item.category?.trim().toUpperCase() === 'AKSESORIS') && item.gender && (
                         <div className="absolute top-3 left-3 flex flex-col gap-2">
                           <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md backdrop-blur-sm bg-opacity-90 ${item.gender === 'L' ? 'bg-blue-500' : 'bg-pink-500'}`}>
                             {item.gender}
@@ -859,7 +859,7 @@ export default function App() {
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
-                {(selectedItem.category?.trim().toUpperCase() === 'KOSTUM') && selectedItem.gender && (
+                {(selectedItem.category?.trim().toUpperCase() === 'KOSTUM' || selectedItem.category?.trim().toUpperCase() === 'AKSESORIS') && selectedItem.gender && (
                   <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
                     <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg backdrop-blur-sm bg-opacity-90 ${selectedItem.gender === 'L' ? 'bg-blue-500' : 'bg-pink-500'}`}>
                       {selectedItem.gender}
