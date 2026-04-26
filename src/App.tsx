@@ -168,7 +168,7 @@ export default function App() {
             expectedReturnDate: item.expectedreturndate || '',
             allowPartialBorrowing: item.allowpartialborrowing !== false,
             subcategory: item.subcategory || (item.category?.trim().toUpperCase() === 'KOSTUM' ? (item.name.toLowerCase().includes('celana') ? 'Celana' : item.name.toLowerCase().includes('outer') ? 'Outer' : (item.name.toLowerCase().includes('kalung') || item.name.toLowerCase().includes('topi')) ? 'Aksesoris' : 'Baju') : undefined),
-            gender: (item.gender === 'lakilaki' ? 'L' : item.gender === 'perempuan' ? 'P' : item.gender) || ((item.category?.trim().toUpperCase() === 'KOSTUM' || item.category?.trim().toUpperCase() === 'AKSESORIS') ? ((item.name.toLowerCase().includes('pria') || item.name.toLowerCase().match(/\bcowok\b/i)) ? 'L' : (item.name.toLowerCase().includes('wanita') || item.name.toLowerCase().match(/\bcewek\b/i) || item.name.toLowerCase().includes('dress') || item.name.toLowerCase().includes('rok') || item.name.toLowerCase().includes('kebaya')) ? 'P' : ((item.id.charCodeAt(0) + item.name.length) % 2 === 0 ? 'L' : 'P')) : undefined),
+            gender: (item.gender === 'lakilaki' ? 'L' : item.gender === 'perempuan' ? 'P' : item.gender === 'genderless' ? undefined : item.gender) || ((item.category?.trim().toUpperCase() === 'KOSTUM' || item.category?.trim().toUpperCase() === 'AKSESORIS') ? ((item.name.toLowerCase().includes('pria') || item.name.toLowerCase().match(/\bcowok\b/i)) ? 'L' : (item.name.toLowerCase().includes('wanita') || item.name.toLowerCase().match(/\bcewek\b/i) || item.name.toLowerCase().includes('dress') || item.name.toLowerCase().includes('rok') || item.name.toLowerCase().includes('kebaya')) ? 'P' : undefined) : undefined),
           };
         });
         
@@ -206,7 +206,7 @@ export default function App() {
           ? item.subcategory?.toUpperCase() === selectedSubcategory.toUpperCase() 
           : true;
       const matchesGender = (selectedCategory.trim().toUpperCase() === 'KOSTUM' || selectedCategory.trim().toUpperCase() === 'AKSESORIS') && selectedGender !== 'Semua'
-          ? (selectedGender === 'Laki-laki' ? item.gender === 'L' : selectedGender === 'Perempuan' ? item.gender === 'P' : true)
+          ? (selectedGender === 'Laki-laki' ? item.gender === 'L' : selectedGender === 'Perempuan' ? item.gender === 'P' : selectedGender === 'Genderless' ? !item.gender : true)
           : true;
 
       return matchesSearch && matchesCategory && matchesStatus && matchesSubcategory && matchesGender;
@@ -738,13 +738,13 @@ export default function App() {
                 {(selectedCategory.trim().toUpperCase() === 'KOSTUM' || selectedCategory.trim().toUpperCase() === 'AKSESORIS') && (
                   <div className={`flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide ${availableSubcategories.length > 1 ? 'border-l border-gray-200 dark:border-gray-700 pl-4' : ''}`}>
                     <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Gender:</span>
-                    {['Semua', 'Laki-laki', 'Perempuan'].map(gen => (
+                    {['Semua', 'Laki-laki', 'Perempuan', 'Genderless'].map(gen => (
                       <button
                         key={gen}
                         onClick={() => setSelectedGender(gen)}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
                           selectedGender === gen
-                            ? (gen === 'Laki-laki' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : gen === 'Perempuan' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800')
+                            ? (gen === 'Laki-laki' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : gen === 'Perempuan' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800' : gen === 'Genderless' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 border border-green-200 dark:border-green-800' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800')
                             : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }`}
                       >
