@@ -188,13 +188,13 @@ export default function App() {
   const availableSubcategories = useMemo(() => {
     const subs = new Set<string>();
     inventoryData.forEach(item => {
-      if (item.category?.trim().toUpperCase() === 'KOSTUM' && item.subcategory) {
+      if ((selectedCategory === 'Semua' || item.category?.toLowerCase() === selectedCategory.toLowerCase()) && item.subcategory) {
         const sub = item.subcategory.trim();
         subs.add(sub.charAt(0).toUpperCase() + sub.slice(1));
       }
     });
     return ['Semua', ...Array.from(subs).sort()];
-  }, [inventoryData]);
+  }, [inventoryData, selectedCategory]);
 
   const filteredItems = useMemo(() => {
     let result = inventoryData.filter(item => {
@@ -202,7 +202,7 @@ export default function App() {
                             (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory = selectedCategory === 'Semua' || item.category?.toLowerCase() === selectedCategory.toLowerCase();
       const matchesStatus = sortBy === 'Tersedia' ? item.status === 'Tersedia' : true;
-      const matchesSubcategory = selectedCategory.trim().toUpperCase() === 'KOSTUM' && selectedSubcategory !== 'Semua' 
+      const matchesSubcategory = selectedSubcategory !== 'Semua' 
           ? item.subcategory?.toUpperCase() === selectedSubcategory.toUpperCase() 
           : true;
       const matchesGender = selectedCategory.trim().toUpperCase() === 'KOSTUM' && selectedGender !== 'Semua'
@@ -714,40 +714,45 @@ export default function App() {
               </div>
             </div>
 
-            {(selectedCategory.trim().toUpperCase() === 'KOSTUM') && (
+            {(availableSubcategories.length > 1 || selectedCategory.trim().toUpperCase() === 'KOSTUM') && (
               <div className="flex flex-col sm:flex-row gap-4 mb-6 -mt-2">
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
-                  <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Jenis:</span>
-                  {availableSubcategories.map(sub => (
-                    <button
-                      key={sub}
-                      onClick={() => setSelectedSubcategory(sub)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                        selectedSubcategory === sub
-                          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
-                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {sub}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide border-l border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Gender:</span>
-                  {['Semua', 'Laki-laki', 'Perempuan'].map(gen => (
-                    <button
-                      key={gen}
-                      onClick={() => setSelectedGender(gen)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                        selectedGender === gen
-                          ? (gen === 'Laki-laki' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : gen === 'Perempuan' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800')
-                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {gen}
-                    </button>
-                  ))}
-                </div>
+                {availableSubcategories.length > 1 && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Jenis:</span>
+                    {availableSubcategories.map(sub => (
+                      <button
+                        key={sub}
+                        onClick={() => setSelectedSubcategory(sub)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                          selectedSubcategory === sub
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
+                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {sub}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {selectedCategory.trim().toUpperCase() === 'KOSTUM' && (
+                  <div className={`flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide ${availableSubcategories.length > 1 ? 'border-l border-gray-200 dark:border-gray-700 pl-4' : ''}`}>
+                    <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Gender:</span>
+                    {['Semua', 'Laki-laki', 'Perempuan'].map(gen => (
+                      <button
+                        key={gen}
+                        onClick={() => setSelectedGender(gen)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                          selectedGender === gen
+                            ? (gen === 'Laki-laki' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : gen === 'Perempuan' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800')
+                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {gen}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1278,7 +1283,7 @@ export default function App() {
 
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  if (adminUsername === 'admin' && adminPassword === 'paragita2024') {
+                  if (adminUsername === 'admin' && adminPassword === 'inventaris2026') {
                     setIsAdminAuthenticated(true);
                     setIsAdminLoginOpen(false);
                     setCurrentView('admin');
