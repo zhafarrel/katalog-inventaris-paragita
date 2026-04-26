@@ -13,6 +13,8 @@ export default function App() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('Semua');
+  const [selectedGender, setSelectedGender] = useState<string>('Semua');
   const [sortBy, setSortBy] = useState<string>('Terbaru');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   
@@ -86,6 +88,8 @@ export default function App() {
                     availablequantity
                     totalquantity
                     description
+                    gender
+                    subcategory
                     image {
                       url
                     }
@@ -162,7 +166,9 @@ export default function App() {
             borrowLogs,
             borrowDate: item.borrowdate || '',
             expectedReturnDate: item.expectedreturndate || '',
-            allowPartialBorrowing: item.allowpartialborrowing !== false, // default to true if undefined
+            allowPartialBorrowing: item.allowpartialborrowing !== false,
+            subcategory: item.subcategory || (item.category?.trim().toUpperCase() === 'KOSTUM' ? (item.name.toLowerCase().includes('celana') ? 'Celana' : item.name.toLowerCase().includes('outer') ? 'Outer' : (item.name.toLowerCase().includes('kalung') || item.name.toLowerCase().includes('topi')) ? 'Aksesoris' : 'Baju') : undefined),
+            gender: (item.gender === 'lakilaki' ? 'L' : item.gender === 'perempuan' ? 'P' : item.gender) || (item.category?.trim().toUpperCase() === 'KOSTUM' ? ((item.name.toLowerCase().includes('pria') || item.name.toLowerCase().match(/\bcowok\b/i)) ? 'L' : (item.name.toLowerCase().includes('wanita') || item.name.toLowerCase().match(/\bcewek\b/i) || item.name.toLowerCase().includes('dress') || item.name.toLowerCase().includes('rok') || item.name.toLowerCase().includes('kebaya')) ? 'P' : ((item.id.charCodeAt(0) + item.name.length) % 2 === 0 ? 'L' : 'P')) : undefined),
           };
         });
         
@@ -185,7 +191,14 @@ export default function App() {
                             (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory = selectedCategory === 'Semua' || item.category === selectedCategory;
       const matchesStatus = sortBy === 'Tersedia' ? item.status === 'Tersedia' : true;
-      return matchesSearch && matchesCategory && matchesStatus;
+      const matchesSubcategory = selectedCategory.trim().toUpperCase() === 'KOSTUM' && selectedSubcategory !== 'Semua' 
+          ? item.subcategory?.toUpperCase() === selectedSubcategory.toUpperCase() 
+          : true;
+      const matchesGender = selectedCategory.trim().toUpperCase() === 'KOSTUM' && selectedGender !== 'Semua'
+          ? (selectedGender === 'Laki-laki' ? item.gender === 'L' : selectedGender === 'Perempuan' ? item.gender === 'P' : true)
+          : true;
+
+      return matchesSearch && matchesCategory && matchesStatus && matchesSubcategory && matchesGender;
     });
 
     if (sortBy === 'A-Z') {
@@ -195,7 +208,7 @@ export default function App() {
     }
 
     return result;
-  }, [searchQuery, selectedCategory, inventoryData, sortBy]);
+  }, [searchQuery, selectedCategory, selectedSubcategory, selectedGender, inventoryData, sortBy]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -238,7 +251,7 @@ export default function App() {
       const response = await fetch(`https://site-api.datocms.com/items/${itemId}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer bcfd3c1a0dda45c7999f046df54ad5`,
+          'Authorization': `Bearer ${import.meta.env.VITE_DATOCMS_API_TOKEN}`,
           'X-Api-Version': '3',
           'Accept': 'application/json',
           'Content-Type': 'application/vnd.api+json'
@@ -268,7 +281,7 @@ export default function App() {
            await fetch(`https://site-api.datocms.com/items/${itemId}`, {
             method: 'PUT',
             headers: {
-              'Authorization': `Bearer bcfd3c1a0dda45c7999f046df54ad5`,
+              'Authorization': `Bearer ${import.meta.env.VITE_DATOCMS_API_TOKEN}`,
               'X-Api-Version': '3',
               'Accept': 'application/json',
               'Content-Type': 'application/vnd.api+json'
@@ -296,7 +309,7 @@ export default function App() {
       const publishResponse = await fetch(`https://site-api.datocms.com/items/${itemId}/publish`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer bcfd3c1a0dda45c7999f046df54ad5`,
+          'Authorization': `Bearer ${import.meta.env.VITE_DATOCMS_API_TOKEN}`,
           'X-Api-Version': '3',
           'Accept': 'application/json'
         }
@@ -658,33 +671,74 @@ export default function App() {
                 <Filter className="h-5 w-5 text-gray-400 dark:text-gray-500 mr-2 flex-shrink-0" />
                 {categories.map(category => (
                   <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                  selectedCategory === category
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-          
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Urutkan:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-2 transition-colors outline-none cursor-pointer"
-            >
-              <option value="Terbaru">Terbaru</option>
-              <option value="A-Z">A - Z</option>
-              <option value="Z-A">Z - A</option>
-              <option value="Tersedia">Hanya yang Tersedia</option>
-            </select>
-          </div>
-        </div>
+                    key={category}
+                    onClick={() => {
+                      setSelectedCategory(category);
+                      setSelectedSubcategory('Semua');
+                      setSelectedGender('Semua');
+                    }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                      selectedCategory === category
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Urutkan:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block p-2 transition-colors outline-none cursor-pointer"
+                >
+                  <option value="Terbaru">Terbaru</option>
+                  <option value="A-Z">A - Z</option>
+                  <option value="Z-A">Z - A</option>
+                  <option value="Tersedia">Hanya yang Tersedia</option>
+                </select>
+              </div>
+            </div>
+
+            {(selectedCategory.trim().toUpperCase() === 'KOSTUM') && (
+              <div className="flex flex-col sm:flex-row gap-4 mb-6 -mt-2">
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+                  <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Jenis:</span>
+                  {['Semua', 'Baju', 'Outer', 'Celana', 'Aksesoris'].map(sub => (
+                    <button
+                      key={sub}
+                      onClick={() => setSelectedSubcategory(sub)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                        selectedSubcategory === sub
+                          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {sub}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide border-l border-gray-200 dark:border-gray-700 pl-4">
+                  <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Gender:</span>
+                  {['Semua', 'Laki-laki', 'Perempuan'].map(gen => (
+                    <button
+                      key={gen}
+                      onClick={() => setSelectedGender(gen)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                        selectedGender === gen
+                          ? (gen === 'Laki-laki' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : gen === 'Perempuan' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800')
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {gen}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
@@ -717,6 +771,13 @@ export default function App() {
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
                       />
+                      {(item.category?.trim().toUpperCase() === 'KOSTUM') && item.gender && (
+                        <div className="absolute top-3 left-3 flex flex-col gap-2">
+                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md backdrop-blur-sm bg-opacity-90 ${item.gender === 'L' ? 'bg-blue-500' : 'bg-pink-500'}`}>
+                            {item.gender}
+                          </span>
+                        </div>
+                      )}
                       <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 ${getStatusColor(item.status)}`}>
                           {item.status}
@@ -782,6 +843,13 @@ export default function App() {
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
+                {(selectedItem.category?.trim().toUpperCase() === 'KOSTUM') && selectedItem.gender && (
+                  <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
+                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg backdrop-blur-sm bg-opacity-90 ${selectedItem.gender === 'L' ? 'bg-blue-500' : 'bg-pink-500'}`}>
+                      {selectedItem.gender}
+                    </span>
+                  </div>
+                )}
                 <button 
                   onClick={() => setSelectedItem(null)}
                   className="absolute top-4 right-4 md:hidden p-2 bg-black/20 hover:bg-black/40 dark:bg-black/40 dark:hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors"
@@ -1246,6 +1314,66 @@ export default function App() {
                     Masuk
                   </button>
                 </form>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Konfirmasi Hapus Log */}
+      <AnimatePresence>
+        {returnConfirmData && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              onClick={() => setReturnConfirmData(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 overflow-hidden border border-gray-100 dark:border-gray-800"
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Trash2 className="text-rose-600 dark:text-rose-400" size={24} />
+                    Konfirmasi Hapus Log
+                  </h2>
+                  <button 
+                    onClick={() => setReturnConfirmData(null)}
+                    className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-gray-600 dark:text-gray-300">
+                    Apakah Anda yakin ingin menghapus log peminjaman untuk barang <strong>"{returnConfirmData.item.name}"</strong>?
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    Data peminjam akan dihapus dan barang akan kembali tersedia. Tindakan ini tidak dapat dibatalkan.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setReturnConfirmData(null)}
+                    className="flex-1 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={confirmReturnAction}
+                    className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-colors shadow-sm"
+                  >
+                    Ya, Hapus Log
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>

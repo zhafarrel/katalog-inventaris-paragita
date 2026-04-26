@@ -23,6 +23,8 @@ export interface InventoryItem {
   expectedReturnDate?: string;
   allowPartialBorrowing?: boolean;
   borrowLogs?: BorrowLog[];
+  subcategory?: string;
+  gender?: string;
 }
 
 export interface CartItem extends InventoryItem {
