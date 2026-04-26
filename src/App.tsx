@@ -188,7 +188,7 @@ export default function App() {
   const availableSubcategories = useMemo(() => {
     const subs = new Set<string>();
     inventoryData.forEach(item => {
-      if ((selectedCategory === 'Semua' || item.category?.toLowerCase() === selectedCategory.toLowerCase()) && item.subcategory) {
+      if ((selectedCategory === 'Semua' || item.category?.toLowerCase().replace(/\s+/g, '') === selectedCategory.toLowerCase().replace(/\s+/g, '')) && item.subcategory) {
         const sub = item.subcategory.trim();
         subs.add(sub.charAt(0).toUpperCase() + sub.slice(1));
       }
@@ -200,7 +200,7 @@ export default function App() {
     let result = inventoryData.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesCategory = selectedCategory === 'Semua' || item.category?.toLowerCase() === selectedCategory.toLowerCase();
+      const matchesCategory = selectedCategory === 'Semua' || item.category?.toLowerCase().replace(/\s+/g, '') === selectedCategory.toLowerCase().replace(/\s+/g, '');
       const matchesStatus = sortBy === 'Tersedia' ? item.status === 'Tersedia' : true;
       const matchesSubcategory = selectedSubcategory !== 'Semua' 
           ? item.subcategory?.toUpperCase() === selectedSubcategory.toUpperCase() 
