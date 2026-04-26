@@ -183,13 +183,24 @@ export default function App() {
     fetchData();
   }, []);
 
-  const categories = ['Semua', ...Array.from(new Set(inventoryData.map(item => item.category)))];
+  const categories = ['Semua', 'Kostum', 'Aksesoris', 'Alat Musik', 'Penghargaan', 'Lain lain'];
+
+  const availableSubcategories = useMemo(() => {
+    const subs = new Set<string>();
+    inventoryData.forEach(item => {
+      if (item.category?.trim().toUpperCase() === 'KOSTUM' && item.subcategory) {
+        const sub = item.subcategory.trim();
+        subs.add(sub.charAt(0).toUpperCase() + sub.slice(1));
+      }
+    });
+    return ['Semua', ...Array.from(subs).sort()];
+  }, [inventoryData]);
 
   const filteredItems = useMemo(() => {
     let result = inventoryData.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesCategory = selectedCategory === 'Semua' || item.category === selectedCategory;
+      const matchesCategory = selectedCategory === 'Semua' || item.category?.toLowerCase() === selectedCategory.toLowerCase();
       const matchesStatus = sortBy === 'Tersedia' ? item.status === 'Tersedia' : true;
       const matchesSubcategory = selectedCategory.trim().toUpperCase() === 'KOSTUM' && selectedSubcategory !== 'Semua' 
           ? item.subcategory?.toUpperCase() === selectedSubcategory.toUpperCase() 
@@ -707,7 +718,7 @@ export default function App() {
               <div className="flex flex-col sm:flex-row gap-4 mb-6 -mt-2">
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
                   <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Jenis:</span>
-                  {['Semua', 'Baju', 'Outer', 'Celana', 'Aksesoris'].map(sub => (
+                  {availableSubcategories.map(sub => (
                     <button
                       key={sub}
                       onClick={() => setSelectedSubcategory(sub)}
