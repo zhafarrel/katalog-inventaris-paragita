@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon, Loader2, ShoppingCart, Trash2, Shield, ArrowLeft, Clock } from 'lucide-react';
+import { Search, Filter, Package, Info, MapPin, Calendar, User, X, Sun, Moon, Loader2, ShoppingCart, Trash2, Shield, ArrowLeft, Clock, FileText, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { InventoryItem, ItemStatus, CartItem, BorrowLog } from './types';
 
@@ -22,6 +22,7 @@ export default function App() {
   const [quantityModalAction, setQuantityModalAction] = useState<'cart' | 'checkout' | null>(null);
   const [tempQuantity, setTempQuantity] = useState<number | string>(1);
   const [tempBorrowerName, setTempBorrowerName] = useState<string>('');
+  const [tempReturnDate, setTempReturnDate] = useState<string>('');
   
   const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,6 +31,16 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [returnConfirmData, setReturnConfirmData] = useState<{item: InventoryItem, logId: string} | null>(null);
+  
+  const [showSopModal, setShowSopModal] = useState(false);
+  const [sopAgreed, setSopAgreed] = useState(false);
+  const [pendingCheckoutData, setPendingCheckoutData] = useState<{
+    action: 'cart' | 'single';
+    item?: InventoryItem;
+    qty?: number;
+    borrowerName?: string;
+    returnDate?: string;
+  } | null>(null);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -52,11 +63,14 @@ export default function App() {
       if (cartItem) {
         setTempQuantity(cartItem.borrowQuantity);
         setTempBorrowerName(cartItem.borrowerName || tempBorrowerName);
+        setTempReturnDate(cartItem.returnDate || tempReturnDate);
       } else if (!quantityModalItem.allowPartialBorrowing && quantityModalItem.availableQuantity === quantityModalItem.totalQuantity) {
         setTempQuantity(quantityModalItem.totalQuantity);
       } else {
         setTempQuantity(1);
       }
+    } else {
+      setTempReturnDate('');
     }
   }, [quantityModalItem, cart]);
 
@@ -392,21 +406,69 @@ export default function App() {
       return;
     }
     
+    if (!tempReturnDate) {
+      alert("Mohon isi tanggal pengembalian terlebih dahulu.");
+      return;
+    }
+    
     const qty = typeof tempQuantity === 'number' ? tempQuantity : parseInt(tempQuantity, 10) || 1;
     const finalQty = Math.max(1, Math.min(quantityModalItem.availableQuantity, qty));
 
     if (quantityModalAction === 'cart') {
       if (!cart.some(i => i.id === quantityModalItem.id)) {
-        setCart([...cart, { ...quantityModalItem, borrowQuantity: finalQty, borrowerName: tempBorrowerName }]);
+        setCart([...cart, { ...quantityModalItem, borrowQuantity: finalQty, borrowerName: tempBorrowerName, returnDate: tempReturnDate }]);
+      } else {
+        setCart(cart.map(i => i.id === quantityModalItem.id ? { ...i, borrowQuantity: finalQty, borrowerName: tempBorrowerName, returnDate: tempReturnDate } : i));
       }
+      setQuantityModalItem(null);
+      setQuantityModalAction(null);
     } else {
-      const phoneNumber = "6281218795969"; 
-      const message = `Halo pengurus Invent, saya ingin meminjam barang berikut:\n\nNama Peminjam: *${tempBorrowerName}*\nNama Barang: *${quantityModalItem.name}*\nJumlah: *${finalQty} buah*\nKategori: *${quantityModalItem.category}*\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
+      setPendingCheckoutData({
+        action: 'single',
+        item: quantityModalItem,
+        qty: finalQty,
+        borrowerName: tempBorrowerName,
+        returnDate: tempReturnDate
+      });
+      setShowSopModal(true);
+      setQuantityModalItem(null);
+      setQuantityModalAction(null);
+    }
+  };
+
+  // Fungsi untuk checkout via WhatsApp
+  const handleCheckout = () => {
+    if (cart.length === 0) return;
+    setPendingCheckoutData({
+      action: 'cart'
+    });
+    setShowSopModal(true);
+  };
+
+  const processCheckoutWhatsApp = () => {
+    if (!pendingCheckoutData) return;
+
+    if (pendingCheckoutData.action === 'single') {
+      const { item: quantityModalItem, qty: finalQty, borrowerName: tempBorrowerName, returnDate: tempReturnDate } = pendingCheckoutData;
+      if (!quantityModalItem || !finalQty || !tempBorrowerName || !tempReturnDate) return;
+
+      const phoneNumber = "6281218795969";
+      
+      // Format return date nicely if possible
+      let formattedReturnDate = tempReturnDate;
+      try {
+        const d = new Date(tempReturnDate);
+        if (!isNaN(d.getTime())) {
+          formattedReturnDate = d.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+      } catch (e) {}
+      
+      const message = `Halo pengurus Invent, saya ingin meminjam barang berikut:\n\nNama Peminjam: *${tempBorrowerName}*\nNama Barang: *${quantityModalItem.name}*\nJumlah: *${finalQty} buah*\nKategori: *${quantityModalItem.category}*\nTanggal Pengembalian: *${formattedReturnDate}*\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
       
       // Update local inventory data to reflect the borrowing
       const borrowDate = new Date().toISOString();
-      const expectedReturnDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Default 7 days
+      const expectedReturnDate = new Date(tempReturnDate).toISOString();
       
       const updatedInventory = inventoryData.map(item => {
         if (item.id === quantityModalItem.id) {
@@ -448,70 +510,78 @@ export default function App() {
       setInventoryData(updatedInventory);
       
       window.open(whatsappUrl, '_blank');
+    } else if (pendingCheckoutData.action === 'cart') {
+      const phoneNumber = "6281218795969"; 
+      const borrowerName = cart[0].borrowerName || "Peminjam";
+      const itemList = cart.map((item, index) => {
+        let returnDateStr = item.returnDate || '';
+        try {
+          if (returnDateStr) {
+            const d = new Date(returnDateStr);
+            if (!isNaN(d.getTime())) {
+              returnDateStr = d.toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+            }
+          }
+        } catch(e) {}
+        return `${index + 1}. *${item.name}* (${item.borrowQuantity} buah) - Pengembalian: ${returnDateStr}`;
+      }).join('\n');
+      const message = `Halo pengurus Invent, saya *${borrowerName}* ingin meminjam barang-barang berikut:\n\n${itemList}\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+      
+      // Update local inventory data to reflect the borrowing
+      const updatedInventory = [...inventoryData];
+      const borrowDate = new Date().toISOString();
+      
+      cart.forEach(cartItem => {
+        const index = updatedInventory.findIndex(i => i.id === cartItem.id);
+        if (index !== -1) {
+          const item = updatedInventory[index];
+          const newAvailable = item.availableQuantity - cartItem.borrowQuantity;
+          const newStatus = newAvailable === 0 ? 'Dipinjam' : 'Tersedia';
+          const finalBorrowerName = cartItem.borrowerName || borrowerName;
+          const expectedReturnDate = cartItem.returnDate ? new Date(cartItem.returnDate).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          
+          const newLog: BorrowLog = {
+            id: Math.random().toString(36).substr(2, 9),
+            borrowerName: finalBorrowerName,
+            quantity: cartItem.borrowQuantity,
+            borrowDate: borrowDate,
+            expectedReturnDate: expectedReturnDate
+          };
+          const newBorrowLogs = [...(item.borrowLogs || []), newLog];
+          const newBorrowerInfoString = JSON.stringify(newBorrowLogs);
+          
+          // Update to DatoCMS
+          updateDatoCMSItem(
+            item.id,
+            newAvailable,
+            newStatus,
+            newBorrowerInfoString,
+            borrowDate,
+            expectedReturnDate
+          );
+          
+          updatedInventory[index] = {
+            ...item,
+            availableQuantity: newAvailable,
+            status: newStatus,
+            borrowerInfo: newBorrowerInfoString,
+            borrowLogs: newBorrowLogs,
+            borrowDate: borrowDate,
+            expectedReturnDate: expectedReturnDate,
+          };
+        }
+      });
+      setInventoryData(updatedInventory);
+      setCart([]);
+      setIsCartOpen(false);
+      
+      window.open(whatsappUrl, '_blank');
     }
-    
-    setQuantityModalItem(null);
-    setQuantityModalAction(null);
-  };
 
-  // Fungsi untuk checkout via WhatsApp
-  const handleCheckout = () => {
-    if (cart.length === 0) return;
-    const phoneNumber = "6281218795969"; 
-    const borrowerName = cart[0].borrowerName || "Peminjam";
-    const itemList = cart.map((item, index) => `${index + 1}. *${item.name}* (${item.borrowQuantity} buah)`).join('\n');
-    const message = `Halo pengurus Invent, saya *${borrowerName}* ingin meminjam barang-barang berikut:\n\n${itemList}\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-    
-    // Update local inventory data to reflect the borrowing
-    const updatedInventory = [...inventoryData];
-    const borrowDate = new Date().toISOString();
-    const expectedReturnDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // Default 7 days
-    
-    cart.forEach(cartItem => {
-      const index = updatedInventory.findIndex(i => i.id === cartItem.id);
-      if (index !== -1) {
-        const item = updatedInventory[index];
-        const newAvailable = item.availableQuantity - cartItem.borrowQuantity;
-        const newStatus = newAvailable === 0 ? 'Dipinjam' : 'Tersedia';
-        const finalBorrowerName = cartItem.borrowerName || borrowerName;
-        
-        const newLog: BorrowLog = {
-          id: Math.random().toString(36).substr(2, 9),
-          borrowerName: finalBorrowerName,
-          quantity: cartItem.borrowQuantity,
-          borrowDate: borrowDate,
-          expectedReturnDate: expectedReturnDate
-        };
-        const newBorrowLogs = [...(item.borrowLogs || []), newLog];
-        const newBorrowerInfoString = JSON.stringify(newBorrowLogs);
-        
-        // Update to DatoCMS
-        updateDatoCMSItem(
-          item.id,
-          newAvailable,
-          newStatus,
-          newBorrowerInfoString,
-          borrowDate,
-          expectedReturnDate
-        );
-        
-        updatedInventory[index] = {
-          ...item,
-          availableQuantity: newAvailable,
-          status: newStatus,
-          borrowerInfo: newBorrowerInfoString,
-          borrowLogs: newBorrowLogs,
-          borrowDate: borrowDate,
-          expectedReturnDate: expectedReturnDate,
-        };
-      }
-    });
-    setInventoryData(updatedInventory);
-    setCart([]);
-    setIsCartOpen(false);
-    
-    window.open(whatsappUrl, '_blank');
+    setShowSopModal(false);
+    setSopAgreed(false);
+    setPendingCheckoutData(null);
   };
 
   return (
@@ -715,9 +785,9 @@ export default function App() {
             </div>
 
             {(availableSubcategories.length > 1 || selectedCategory.trim().toUpperCase() === 'KOSTUM' || selectedCategory.trim().toUpperCase() === 'AKSESORIS') && (
-              <div className="flex flex-col sm:flex-row gap-4 mb-6 -mt-2">
+              <div className="flex flex-col gap-3 mb-6 -mt-2">
                 {availableSubcategories.length > 1 && (
-                  <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Jenis:</span>
                     {availableSubcategories.map(sub => (
                       <button
@@ -736,7 +806,7 @@ export default function App() {
                 )}
                 
                 {(selectedCategory.trim().toUpperCase() === 'KOSTUM' || selectedCategory.trim().toUpperCase() === 'AKSESORIS') && (
-                  <div className={`flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide ${availableSubcategories.length > 1 ? 'border-l border-gray-200 dark:border-gray-700 pl-4' : ''}`}>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     <span className="text-sm text-gray-500 dark:text-gray-400 mr-1 flex-shrink-0 font-medium">Gender:</span>
                     {['Semua', 'Laki-laki', 'Perempuan', 'Genderless'].map(gen => (
                       <button
@@ -955,6 +1025,7 @@ export default function App() {
                   <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
                     <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Cara Meminjam</h4>
                     <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-decimal list-inside">
+                      <li>Baca SOP Peminjaman dan Pengembalian barang pada Link berikut: <a href="https://docs.google.com/document/d/16mANm8hp0tWMGzVfD5J-KVkheoUopn1gpQx8I4ZOt4E/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">SOP Inventory</a></li>
                       <li>Pastikan status barang <strong className="text-gray-900 dark:text-white">Tersedia</strong>.</li>
                       <li>Klik tombol "Tambah ke Keranjang" di bawah.</li>
                       <li>Buka Keranjang di pojok kanan atas untuk melihat daftar barang.</li>
@@ -1061,6 +1132,19 @@ export default function App() {
                         value={tempBorrowerName}
                         onChange={(e) => setTempBorrowerName(e.target.value)}
                         placeholder="Masukkan nama Anda"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Tanggal Pengembalian
+                      </label>
+                      <input 
+                        type="date" 
+                        value={tempReturnDate}
+                        onChange={(e) => setTempReturnDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
                       />
                     </div>
@@ -1396,58 +1480,142 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Modal Konfirmasi Hapus Log */}
+      {/* Modal SOP Peminjaman */}
       <AnimatePresence>
-        {returnConfirmData && (
+        {showSopModal && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-              onClick={() => setReturnConfirmData(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              onClick={() => setShowSopModal(false)}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 overflow-hidden border border-gray-100 dark:border-gray-800"
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-xl max-h-[85vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 flex flex-col border border-gray-100 dark:border-gray-800"
             >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Trash2 className="text-rose-600 dark:text-rose-400" size={24} />
-                    Konfirmasi Hapus Log
-                  </h2>
-                  <button 
-                    onClick={() => setReturnConfirmData(null)}
-                    className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center shrink-0">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <FileText className="text-indigo-600 dark:text-indigo-400" size={24} />
+                  SOP Peminjaman
+                </h2>
+                <button 
+                  onClick={() => setShowSopModal(false)}
+                  className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
-                <div className="mb-6">
-                  <p className="text-gray-600 dark:text-gray-300">
-                    Apakah Anda yakin ingin menghapus log peminjaman untuk barang <strong>"{returnConfirmData.item.name}"</strong>?
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    Data peminjam akan dihapus dan barang akan kembali tersedia. Tindakan ini tidak dapat dibatalkan.
-                  </p>
+              <div className="p-6 overflow-y-auto grow">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-gray-600 dark:text-gray-300">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 text-center uppercase">SOP Peminjaman</h3>
+                  <p className="mb-4 text-justify">Sebagai bentuk tertib administrasi dan tanggung jawab dalam penggunaan aset UKM Paduan Suara Mahasiswa Paragita, setiap anggota yang ingin meminjam inventory wajib mengikuti ketentuan berikut:</p>
+                  
+                  <ol className="list-decimal pl-4 space-y-4 mb-8 text-justify">
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Pengajuan Peminjaman</strong>
+                      <p className="mt-1">Peminjaman dilakukan dengan mengisi Google Form Peminjaman yang telah disediakan oleh Divisi Inventory. Form wajib diisi secara lengkap dan sesuai kebutuhan kegiatan.</p>
+                    </li>
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Informasi yang Dicantumkan</strong>
+                      <p className="mt-1">Pada saat pengisian form, peminjam wajib mencantumkan:</p>
+                      <ul className="list-[lower-alpha] pl-4 mt-1 space-y-1">
+                        <li>Nama dan divisi</li>
+                        <li>Nama barang dan jumlah yang dipinjam disertai bukti foto</li>
+                        <li>Keperluan penggunaan</li>
+                        <li>Tanggal peminjaman dan tanggal pengembalian</li>
+                      </ul>
+                    </li>
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Persetujuan dan Konfirmasi</strong>
+                      <p className="mt-1">Setelah form dikirimkan, Divisi Inventory akan melakukan pengecekan ketersediaan barang. Peminjaman dinyatakan sah setelah mendapatkan konfirmasi persetujuan.</p>
+                    </li>
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Pengambilan Barang</strong>
+                      <p className="mt-1">Barang dapat diambil sesuai waktu yang telah disepakati dengan Admin/Divisi Inventory. Pada saat pengambilan, peminjam wajib memeriksa kondisi dan kelengkapan barang.</p>
+                    </li>
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Tanggung Jawab Peminjam</strong>
+                      <p className="mt-1">Selama masa peminjaman, peminjam bertanggung jawab atas keamanan, kondisi, dan kelengkapan barang hingga waktu pengembalian sesuai ketentuan yang berlaku.</p>
+                    </li>
+                  </ol>
+
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 mt-8 text-center uppercase">SOP Pengembalian</h3>
+                  <p className="mb-4 text-justify">Sebagai bentuk tanggung jawab bersama dalam menjaga aset UKM Paduan Suara Mahasiswa Paragita, setiap inventory yang telah dipinjam melalui Google Form wajib dikembalikan sesuai ketentuan berikut:</p>
+                  
+                  <ol className="list-decimal pl-4 space-y-4 text-justify">
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Waktu Pengembalian</strong>
+                      <p className="mt-1">Barang dikembalikan sesuai tanggal yang tertera pada form peminjaman. Jika membutuhkan perpanjangan, peminjam wajib menghubungi Admin/Divisi Inventory sebelum masa pinjam berakhir.</p>
+                    </li>
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Kondisi Barang</strong>
+                      <ul className="list-[lower-alpha] pl-4 mt-1 space-y-1">
+                        <li>Sebelum dikembalikan, pastikan barang:</li>
+                        <li>Dalam keadaan bersih dan layak pakai</li>
+                        <li>Lengkap sesuai saat diterima</li>
+                        <li>Tidak tertukar atau tercecer komponennya</li>
+                      </ul>
+                    </li>
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Serah Terima dan Pengecekan</strong>
+                      <p className="mt-1">Pengembalian dilakukan langsung kepada Admin/Divisi Inventory. Akan dilakukan pengecekan singkat terkait kondisi dan kelengkapan barang. Pengembalian dianggap selesai setelah dinyatakan diterima.</p>
+                    </li>
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Konfirmasi Administrasi</strong>
+                      <p className="mt-1">Status pengembalian akan dicatat dalam rekap inventory. Jika diperlukan, peminjam juga wajib mengisi Google Form Pengembalian yang telah disediakan.</p>
+                    </li>
+                    <li>
+                      <strong className="text-gray-900 dark:text-gray-100">Kerusakan, Kehilangan, dan Keterlambatan</strong>
+                      <p className="mt-1">Segala bentuk kerusakan atau kehilangan wajib dilaporkan. Peminjam bertanggung jawab sesuai ketentuan yang berlaku. Keterlambatan tanpa konfirmasi akan dicatat sebagai pelanggaran administrasi.</p>
+                    </li>
+                  </ol>
                 </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 dark:border-gray-800 shrink-0 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl">
+                <label className="flex items-start gap-3 cursor-pointer group mb-4">
+                  <div className="relative flex items-center justify-center mt-1">
+                    <input 
+                      type="checkbox" 
+                      className="sr-only"
+                      checked={sopAgreed}
+                      onChange={(e) => setSopAgreed(e.target.checked)}
+                    />
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                      sopAgreed 
+                        ? 'bg-indigo-600 border-indigo-600' 
+                        : 'bg-white border-gray-300 dark:border-gray-600 group-hover:border-indigo-500 shadow-sm'
+                    }`}>
+                      {sopAgreed && <Check size={14} className="text-white" strokeWidth={3} />}
+                    </div>
+                  </div>
+                  <span className="text-sm text-gray-700 dark:text-gray-300 select-none">
+                    Saya telah membaca, memahami, dan menyetujui seluruh ketentuan dalam SOP Peminjaman di atas.
+                  </span>
+                </label>
 
                 <div className="flex gap-3">
                   <button 
-                    onClick={() => setReturnConfirmData(null)}
-                    className="flex-1 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => setShowSopModal(false)}
+                    className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     Batal
                   </button>
                   <button 
-                    onClick={confirmReturnAction}
-                    className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-xl transition-colors shadow-sm"
+                    onClick={processCheckoutWhatsApp}
+                    disabled={!sopAgreed}
+                    className={`flex-[2] px-4 py-2.5 text-white text-sm font-medium rounded-xl transition-all shadow-sm ${
+                      sopAgreed 
+                        ? 'bg-green-600 hover:bg-green-700 hover:shadow-md active:scale-[0.98]' 
+                        : 'bg-green-400/50 cursor-not-allowed'
+                    }`}
                   >
-                    Ya, Hapus Log
+                    Lanjut ke WhatsApp
                   </button>
                 </div>
               </div>

@@ -30,4 +30,5 @@ export interface InventoryItem {
 export interface CartItem extends InventoryItem {
   borrowQuantity: number;
   borrowerName?: string;
+  returnDate?: string;
 }
