@@ -22,6 +22,8 @@ export default function App() {
   const [quantityModalAction, setQuantityModalAction] = useState<'cart' | 'checkout' | null>(null);
   const [tempQuantity, setTempQuantity] = useState<number | string>(1);
   const [tempBorrowerName, setTempBorrowerName] = useState<string>('');
+  const [tempDivisi, setTempDivisi] = useState<string>('');
+  const [tempKeperluan, setTempKeperluan] = useState<string>('');
   const [tempReturnDate, setTempReturnDate] = useState<string>('');
   
   const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
@@ -39,6 +41,8 @@ export default function App() {
     item?: InventoryItem;
     qty?: number;
     borrowerName?: string;
+    divisi?: string;
+    keperluan?: string;
     returnDate?: string;
   } | null>(null);
 
@@ -63,6 +67,8 @@ export default function App() {
       if (cartItem) {
         setTempQuantity(cartItem.borrowQuantity);
         setTempBorrowerName(cartItem.borrowerName || tempBorrowerName);
+        setTempDivisi(cartItem.divisi || tempDivisi);
+        setTempKeperluan(cartItem.keperluan || tempKeperluan);
         setTempReturnDate(cartItem.returnDate || tempReturnDate);
       } else if (!quantityModalItem.allowPartialBorrowing && quantityModalItem.availableQuantity === quantityModalItem.totalQuantity) {
         setTempQuantity(quantityModalItem.totalQuantity);
@@ -71,6 +77,8 @@ export default function App() {
       }
     } else {
       setTempReturnDate('');
+      setTempDivisi('');
+      setTempKeperluan('');
     }
   }, [quantityModalItem, cart]);
 
@@ -406,6 +414,16 @@ export default function App() {
       return;
     }
     
+    if (!tempDivisi.trim()) {
+      alert("Mohon isi nama divisi terlebih dahulu.");
+      return;
+    }
+    
+    if (!tempKeperluan.trim()) {
+      alert("Mohon isi keperluan penggunaan terlebih dahulu.");
+      return;
+    }
+    
     if (!tempReturnDate) {
       alert("Mohon isi tanggal pengembalian terlebih dahulu.");
       return;
@@ -416,9 +434,9 @@ export default function App() {
 
     if (quantityModalAction === 'cart') {
       if (!cart.some(i => i.id === quantityModalItem.id)) {
-        setCart([...cart, { ...quantityModalItem, borrowQuantity: finalQty, borrowerName: tempBorrowerName, returnDate: tempReturnDate }]);
+        setCart([...cart, { ...quantityModalItem, borrowQuantity: finalQty, borrowerName: tempBorrowerName, divisi: tempDivisi, keperluan: tempKeperluan, returnDate: tempReturnDate }]);
       } else {
-        setCart(cart.map(i => i.id === quantityModalItem.id ? { ...i, borrowQuantity: finalQty, borrowerName: tempBorrowerName, returnDate: tempReturnDate } : i));
+        setCart(cart.map(i => i.id === quantityModalItem.id ? { ...i, borrowQuantity: finalQty, borrowerName: tempBorrowerName, divisi: tempDivisi, keperluan: tempKeperluan, returnDate: tempReturnDate } : i));
       }
       setQuantityModalItem(null);
       setQuantityModalAction(null);
@@ -428,6 +446,8 @@ export default function App() {
         item: quantityModalItem,
         qty: finalQty,
         borrowerName: tempBorrowerName,
+        divisi: tempDivisi,
+        keperluan: tempKeperluan,
         returnDate: tempReturnDate
       });
       setShowSopModal(true);
@@ -449,8 +469,8 @@ export default function App() {
     if (!pendingCheckoutData) return;
 
     if (pendingCheckoutData.action === 'single') {
-      const { item: quantityModalItem, qty: finalQty, borrowerName: tempBorrowerName, returnDate: tempReturnDate } = pendingCheckoutData;
-      if (!quantityModalItem || !finalQty || !tempBorrowerName || !tempReturnDate) return;
+      const { item: quantityModalItem, qty: finalQty, borrowerName: tempBorrowerName, divisi: tempDivisi, keperluan: tempKeperluan, returnDate: tempReturnDate } = pendingCheckoutData;
+      if (!quantityModalItem || !finalQty || !tempBorrowerName || !tempDivisi || !tempKeperluan || !tempReturnDate) return;
 
       const phoneNumber = "6281218795969";
       
@@ -463,7 +483,7 @@ export default function App() {
         }
       } catch (e) {}
       
-      const message = `Halo pengurus Invent, saya ingin meminjam barang berikut:\n\nNama Peminjam: *${tempBorrowerName}*\nNama Barang: *${quantityModalItem.name}*\nJumlah: *${finalQty} buah*\nKategori: *${quantityModalItem.category}*\nTanggal Pengembalian: *${formattedReturnDate}*\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
+      const message = `Halo pengurus Invent, saya ingin meminjam barang berikut:\n\nNama Peminjam: *${tempBorrowerName}*\nDivisi: *${tempDivisi}*\nNama Barang: *${quantityModalItem.name}*\nJumlah: *${finalQty} buah*\nKategori: *${quantityModalItem.category}*\nKeperluan: *${tempKeperluan}*\nTanggal Pengembalian: *${formattedReturnDate}*\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
       
       // Update local inventory data to reflect the borrowing
@@ -478,6 +498,8 @@ export default function App() {
           const newLog: BorrowLog = {
             id: Math.random().toString(36).substr(2, 9),
             borrowerName: tempBorrowerName,
+            divisi: tempDivisi,
+            keperluan: tempKeperluan,
             quantity: finalQty,
             borrowDate: borrowDate,
             expectedReturnDate: expectedReturnDate
@@ -513,6 +535,8 @@ export default function App() {
     } else if (pendingCheckoutData.action === 'cart') {
       const phoneNumber = "6281218795969"; 
       const borrowerName = cart[0].borrowerName || "Peminjam";
+      const divisi = cart[0].divisi || "-";
+      const keperluan = cart[0].keperluan || "-";
       const itemList = cart.map((item, index) => {
         let returnDateStr = item.returnDate || '';
         try {
@@ -525,7 +549,7 @@ export default function App() {
         } catch(e) {}
         return `${index + 1}. *${item.name}* (${item.borrowQuantity} buah) - Pengembalian: ${returnDateStr}`;
       }).join('\n');
-      const message = `Halo pengurus Invent, saya *${borrowerName}* ingin meminjam barang-barang berikut:\n\n${itemList}\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
+      const message = `Halo pengurus Invent, saya *${borrowerName}* dari divisi *${divisi}* ingin meminjam barang-barang berikut untuk keperluan *${keperluan}*:\n\n${itemList}\n\nMohon infokan lebih lanjut mengenai prosedurnya. Terima kasih.`;
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
       
       // Update local inventory data to reflect the borrowing
@@ -541,9 +565,14 @@ export default function App() {
           const finalBorrowerName = cartItem.borrowerName || borrowerName;
           const expectedReturnDate = cartItem.returnDate ? new Date(cartItem.returnDate).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
           
+          const finalDivisi = cartItem.divisi || divisi;
+          const finalKeperluan = cartItem.keperluan || keperluan;
+          
           const newLog: BorrowLog = {
             id: Math.random().toString(36).substr(2, 9),
             borrowerName: finalBorrowerName,
+            divisi: finalDivisi,
+            keperluan: finalKeperluan,
             quantity: cartItem.borrowQuantity,
             borrowDate: borrowDate,
             expectedReturnDate: expectedReturnDate
@@ -675,75 +704,74 @@ export default function App() {
               </button>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-gray-600 dark:text-gray-400">
-                  <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 text-xs uppercase font-semibold border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                      <th className="px-6 py-4">Barang</th>
-                      <th className="px-6 py-4">Peminjam</th>
-                      <th className="px-6 py-4">Tgl Pinjam</th>
-                      <th className="px-6 py-4">Estimasi Kembali</th>
-                      <th className="px-6 py-4">Jumlah</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-right">Hapus Log</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {inventoryData.flatMap(item => (item.borrowLogs || []).map(log => ({ item, log }))).length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                          Tidak ada barang yang sedang dipinjam.
-                        </td>
-                      </tr>
-                    ) : (
-                      inventoryData
-                        .flatMap(item => (item.borrowLogs || []).map(log => ({ item, log })))
-                        .map(({ item, log }) => (
-                          <tr key={`${item.id}-${log.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <img src={item.imageUrl} alt={item.name} className="w-10 h-10 rounded-lg object-cover bg-gray-100 dark:bg-gray-800" referrerPolicy="no-referrer" />
-                                <div>
-                                  <div className="font-medium text-gray-900 dark:text-white">{item.name}</div>
-                                  <div className="text-xs text-gray-500">{item.category}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                              {log.borrowerName || '-'}
-                            </td>
-                            <td className="px-6 py-4">
-                              {log.borrowDate ? new Date(log.borrowDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                            </td>
-                            <td className="px-6 py-4">
-                              {log.expectedReturnDate ? new Date(log.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
-                                {log.quantity} dipinjam
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-                                {item.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <button
-                                onClick={() => handleReturnItem(item, log.id)}
-                                className="px-3 py-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-xs font-medium rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors"
-                              >
-                                Hapus
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                    )}
-                  </tbody>
-                </table>
+            {inventoryData.flatMap(item => (item.borrowLogs || []).map(log => ({ item, log }))).length === 0 ? (
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-12 text-center text-gray-500 dark:text-gray-400">
+                Tidak ada barang yang sedang dipinjam.
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {inventoryData
+                  .flatMap(item => (item.borrowLogs || []).map(log => ({ item, log })))
+                  .map(({ item, log }) => (
+                    <div key={`${item.id}-${log.id}`} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-5 flex flex-col gap-4 hover:shadow-md transition-shadow">
+                      {/* Header: Item details */}
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-xl object-cover bg-gray-100 dark:bg-gray-800 flex-shrink-0" referrerPolicy="no-referrer" />
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-gray-900 dark:text-white truncate">{item.name}</h3>
+                            <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium uppercase truncate block">{item.category}</span>
+                          </div>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700`}>
+                          {log.quantity} dipinjam
+                        </span>
+                      </div>
+                      
+                      {/* Divider */}
+                      <div className="h-px bg-gray-100 dark:bg-gray-800 w-full"></div>
+                      
+                      {/* Body: Borrower details */}
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Peminjam</p>
+                          <p className="font-medium text-gray-900 dark:text-white truncate" title={log.borrowerName || '-'}>{log.borrowerName || '-'}</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Divisi</p>
+                          <p className="font-medium text-gray-900 dark:text-white truncate" title={log.divisi || '-'}>{log.divisi || '-'}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Keperluan</p>
+                          <p className="font-medium text-gray-900 dark:text-white line-clamp-2" title={log.keperluan || '-'}>{log.keperluan || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Tgl Pinjam</p>
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {log.borrowDate ? new Date(log.borrowDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Estimasi Kembali</p>
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {log.expectedReturnDate ? new Date(log.expectedReturnDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Footer: Actions */}
+                      <div className="mt-auto pt-2 flex justify-end">
+                        <button
+                          onClick={() => handleReturnItem(item, log.id)}
+                          className="px-4 py-2 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-sm font-medium rounded-xl hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors w-full text-center"
+                        >
+                          Hapus Log / Barang Kembali
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -1025,11 +1053,11 @@ export default function App() {
                   <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
                     <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Cara Meminjam</h4>
                     <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-2 list-decimal list-inside">
-                      <li>Baca SOP Peminjaman dan Pengembalian barang pada Link berikut: <a href="https://docs.google.com/document/d/16mANm8hp0tWMGzVfD5J-KVkheoUopn1gpQx8I4ZOt4E/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">SOP Inventory</a></li>
                       <li>Pastikan status barang <strong className="text-gray-900 dark:text-white">Tersedia</strong>.</li>
-                      <li>Klik tombol "Tambah ke Keranjang" di bawah.</li>
-                      <li>Buka Keranjang di pojok kanan atas untuk melihat daftar barang.</li>
-                      <li>Klik "Ajukan Peminjaman via WA" untuk mengonfirmasi ke pengurus.</li>
+                      <li>Klik tombol "Tambah ke Keranjang" di bawah atau "Tentukan Jumlah" jika ingin meminjam lebih dari 1.</li>
+                      <li>Isi form data secara lengkap.</li>
+                      <li>Buka Keranjang di pojok kanan atas untuk melihat daftar barang yang akan dipinjam.</li>
+                      <li>Klik "Ajukan Peminjaman via WA" dan setujui SOP Peminjaman.</li>
                     </ol>
                   </div>
                 </div>
@@ -1094,25 +1122,25 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 overflow-hidden border border-gray-100 dark:border-gray-800"
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl z-50 overflow-hidden border border-gray-100 dark:border-gray-800 max-h-[90vh] flex flex-col"
             >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Package className="text-indigo-600 dark:text-indigo-400" size={24} />
-                    Jumlah Peminjaman
-                  </h2>
-                  <button 
-                    onClick={() => {
-                      setQuantityModalItem(null);
-                      setQuantityModalAction(null);
-                    }}
-                    className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
+              <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center shrink-0">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Package className="text-indigo-600 dark:text-indigo-400" size={24} />
+                  Jumlah Peminjaman
+                </h2>
+                <button 
+                  onClick={() => {
+                    setQuantityModalItem(null);
+                    setQuantityModalAction(null);
+                  }}
+                  className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
+              <div className="p-5 overflow-y-auto styled-scrollbars flex-grow">
                 <div className="mb-6">
                   <div className="flex items-center gap-3 mb-4">
                     <img src={quantityModalItem.imageUrl} alt={quantityModalItem.name} className="w-12 h-12 rounded-lg object-cover bg-gray-100 dark:bg-gray-800" referrerPolicy="no-referrer" />
@@ -1132,6 +1160,32 @@ export default function App() {
                         value={tempBorrowerName}
                         onChange={(e) => setTempBorrowerName(e.target.value)}
                         placeholder="Masukkan nama Anda"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Divisi
+                      </label>
+                      <input 
+                        type="text" 
+                        value={tempDivisi}
+                        onChange={(e) => setTempDivisi(e.target.value)}
+                        placeholder="Masukkan divisi Anda"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Keperluan Penggunaan
+                      </label>
+                      <input 
+                        type="text" 
+                        value={tempKeperluan}
+                        onChange={(e) => setTempKeperluan(e.target.value)}
+                        placeholder="Misal: Penampilan konser, Lomba, dll"
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
                       />
                     </div>
@@ -1216,7 +1270,9 @@ export default function App() {
                     )}
                   </div>
                 </div>
+              </div>
 
+              <div className="p-5 border-t border-gray-100 dark:border-gray-800 shrink-0">
                 <div className="flex gap-3">
                   <button 
                     onClick={() => {
@@ -1518,21 +1574,21 @@ export default function App() {
                   <ol className="list-decimal pl-4 space-y-4 mb-8 text-justify">
                     <li>
                       <strong className="text-gray-900 dark:text-gray-100">Pengajuan Peminjaman</strong>
-                      <p className="mt-1">Peminjaman dilakukan dengan mengisi Google Form Peminjaman yang telah disediakan oleh Divisi Inventory. Form wajib diisi secara lengkap dan sesuai kebutuhan kegiatan.</p>
+                      <p className="mt-1">Peminjaman dilakukan secara online melalui website Inventory Paragita yang telah disediakan oleh Divisi Inventory. Peminjam wajib membuat pengajuan dan memastikan data peminjaman diisi secara lengkap sesuai kebutuhan kegiatan.</p>
                     </li>
                     <li>
                       <strong className="text-gray-900 dark:text-gray-100">Informasi yang Dicantumkan</strong>
-                      <p className="mt-1">Pada saat pengisian form, peminjam wajib mencantumkan:</p>
+                      <p className="mt-1">Pada saat melakukan proses pengajuan di website, peminjam wajib mencantumkan:</p>
                       <ul className="list-[lower-alpha] pl-4 mt-1 space-y-1">
                         <li>Nama dan divisi</li>
-                        <li>Nama barang dan jumlah yang dipinjam disertai bukti foto</li>
+                        <li>Nama barang dan jumlah yang dipinjam</li>
                         <li>Keperluan penggunaan</li>
                         <li>Tanggal peminjaman dan tanggal pengembalian</li>
                       </ul>
                     </li>
                     <li>
                       <strong className="text-gray-900 dark:text-gray-100">Persetujuan dan Konfirmasi</strong>
-                      <p className="mt-1">Setelah form dikirimkan, Divisi Inventory akan melakukan pengecekan ketersediaan barang. Peminjaman dinyatakan sah setelah mendapatkan konfirmasi persetujuan.</p>
+                      <p className="mt-1">Setelah pengajuan berhasil dibuat di website, Divisi Inventory akan melakukan pengecekan ketersediaan barang. Peminjaman dinyatakan sah setelah mendapatkan konfirmasi persetujuan.</p>
                     </li>
                     <li>
                       <strong className="text-gray-900 dark:text-gray-100">Pengambilan Barang</strong>
@@ -1545,7 +1601,7 @@ export default function App() {
                   </ol>
 
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 mt-8 text-center uppercase">SOP Pengembalian</h3>
-                  <p className="mb-4 text-justify">Sebagai bentuk tanggung jawab bersama dalam menjaga aset UKM Paduan Suara Mahasiswa Paragita, setiap inventory yang telah dipinjam melalui Google Form wajib dikembalikan sesuai ketentuan berikut:</p>
+                  <p className="mb-4 text-justify">Sebagai bentuk tanggung jawab bersama dalam menjaga aset UKM Paduan Suara Mahasiswa Paragita, setiap inventory yang telah dipinjam melalui website wajib dikembalikan sesuai ketentuan berikut:</p>
                   
                   <ol className="list-decimal pl-4 space-y-4 text-justify">
                     <li>
@@ -1554,8 +1610,8 @@ export default function App() {
                     </li>
                     <li>
                       <strong className="text-gray-900 dark:text-gray-100">Kondisi Barang</strong>
+                      <p className="mt-1">Sebelum dikembalikan, pastikan barang:</p>
                       <ul className="list-[lower-alpha] pl-4 mt-1 space-y-1">
-                        <li>Sebelum dikembalikan, pastikan barang:</li>
                         <li>Dalam keadaan bersih dan layak pakai</li>
                         <li>Lengkap sesuai saat diterima</li>
                         <li>Tidak tertukar atau tercecer komponennya</li>
