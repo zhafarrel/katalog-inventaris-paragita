@@ -472,7 +472,7 @@ export default function App() {
       const { item: quantityModalItem, qty: finalQty, borrowerName: tempBorrowerName, divisi: tempDivisi, keperluan: tempKeperluan, returnDate: tempReturnDate } = pendingCheckoutData;
       if (!quantityModalItem || !finalQty || !tempBorrowerName || !tempDivisi || !tempKeperluan || !tempReturnDate) return;
 
-      const phoneNumber = "6281218795969";
+      const phoneNumber = "6281227572454";
       
       // Format return date nicely if possible
       let formattedReturnDate = tempReturnDate;
@@ -533,7 +533,7 @@ export default function App() {
       
       window.open(whatsappUrl, '_blank');
     } else if (pendingCheckoutData.action === 'cart') {
-      const phoneNumber = "6281218795969"; 
+      const phoneNumber = "6281227572454"; 
       const borrowerName = cart[0].borrowerName || "Peminjam";
       const divisi = cart[0].divisi || "-";
       const keperluan = cart[0].keperluan || "-";
